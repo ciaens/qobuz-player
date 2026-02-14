@@ -17,9 +17,9 @@ playing_info=playing_info ) {
     class="z-10 mx-auto flex w-full max-w-md grow flex-col justify-between gap-6 p-6"
   >
     <!-- Header -->
-    <div class="pt-safe-or-4 grid grid-cols-3 items-center">
+    <div class="pt-safe-or-4 relative flex items-center justify-between">
       <button
-        class="justify-self-start text-gray-400 transition-colors hover:text-white"
+        class="z-10 flex size-10 items-center justify-center rounded-full text-gray-400 transition-colors hover:bg-white/10 hover:text-white active:scale-95"
         onclick="history.back()"
       >
         <svg
@@ -37,11 +37,11 @@ playing_info=playing_info ) {
         </svg>
       </button>
       <span
-        class="justify-self-center text-xs font-medium tracking-widest text-gray-400 uppercase"
+        class="absolute inset-0 flex items-center justify-center text-xs font-medium tracking-widest text-gray-400 uppercase pointer-events-none pt-safe-or-4"
         >Now Playing</span
       >
       <button
-        class="justify-self-end text-gray-400 transition-colors hover:text-white"
+        class="z-10 flex size-10 items-center justify-center rounded-full text-gray-400 transition-colors hover:bg-white/10 hover:text-white active:scale-95"
       >
         <span class="size-6">
           @defer (icons/queue-list.html) {}
@@ -93,12 +93,16 @@ playing_info=playing_info ) {
         >
           {{ playing_info.artist_name }}
         </a>
-        <a
-          href="{{ playing_info.entity_link }}"
-          class="truncate text-sm text-gray-500 transition-colors hover:text-gray-300"
-        >
-          {{ playing_info.entity_title }}
-        </a>
+        <div class="flex items-center justify-center gap-2 text-sm text-gray-500">
+          <a
+            href="{{ playing_info.entity_link }}"
+            class="truncate transition-colors hover:text-gray-300"
+          >
+            {{ playing_info.entity_title }}
+          </a>
+          <span>•</span>
+          <span>{{ current_position }} of {{ number_of_tracks }}</span>
+        </div>
       </div>
 
       <!-- Quality Info -->
