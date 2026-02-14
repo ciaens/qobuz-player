@@ -9,7 +9,7 @@ playing_info=playing_info ) {
 >
   <!-- Background Blur -->
   <div
-    class="absolute inset-0 -z-10 scale-110 bg-cover bg-center bg-no-repeat opacity-30 blur-3xl transition-all duration-1000"
+    class="fixed inset-0 -z-10 scale-110 bg-cover bg-center bg-no-repeat opacity-30 blur-3xl transition-all duration-1000"
     style="@if(playing_info.cover_image){background-image: url({{ playing_info.cover_image }});}"
   ></div>
 
@@ -40,13 +40,14 @@ playing_info=playing_info ) {
         class="absolute inset-0 flex items-center justify-center text-xs font-medium tracking-widest text-gray-400 uppercase pointer-events-none pt-safe-or-4"
         >Now Playing</span
       >
-      <button
+      <a
+        href="/queue"
         class="z-10 flex size-10 items-center justify-center rounded-full text-gray-400 transition-colors hover:bg-white/10 hover:text-white active:scale-95"
       >
         <span class="size-6">
           @defer (icons/queue-list.html) {}
         </span>
-      </button>
+      </a>
     </div>
 
     <!-- Artwork -->
