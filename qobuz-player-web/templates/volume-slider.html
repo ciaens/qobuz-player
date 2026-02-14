@@ -1,13 +1,20 @@
-<input
-  id="volume-slider"
-  class="w-full accent-blue-500"
-  autocomplete="off"
-  hx-post="/api/volume"
-  hx-trigger="input delay:100ms"
-  hx-swap="none"
-  value="{{ current_volume }}"
-  type="range"
-  name="value"
-  min="0"
-  max="100"
-/>
+<div class="flex items-center gap-4 text-gray-400">
+  <div class="size-6 shrink-0">
+    @defer (icons/speaker-wave.html) {}
+  </div>
+  <input
+    id="volume-slider"
+    class="h-1 w-full grow appearance-none rounded-full bg-gray-700 accent-blue-500 hover:accent-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-black"
+    autocomplete="off"
+    hx-post="/api/volume"
+    hx-trigger="input delay:100ms"
+    hx-swap="none"
+    value="{{ current_volume }}"
+    type="range"
+    name="value"
+    min="0"
+    max="100"
+    oninput="document.getElementById('volume-percentage').textContent = this.value + '%'"
+  />
+  <span id="volume-percentage" class="w-10 text-right text-sm font-medium tabular-nums">{{ current_volume }}%</span>
+</div>
