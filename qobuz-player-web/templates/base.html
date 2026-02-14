@@ -1,5 +1,9 @@
 @if (partial) {
   {{ content }}
+  @if (!active_page || active_page != "NowPlaying") {
+    @defer (controls.html; playing_info=playing_info) {}
+  }
+  @defer (navigation.html; active_page=active_page) {}
 } @else {
   <!doctype html>
   <html lang="en" class="dark">

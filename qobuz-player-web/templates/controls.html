@@ -12,7 +12,7 @@
     >
       <a
         href="/now-playing"
-        hx-target="unset"
+        hx-target="body"
         class="absolute inset-0 z-0 rounded-md"
       ></a>
 
@@ -25,7 +25,7 @@
         ></div>
         <a
           href="{{ playing_info.entity_link }}"
-          hx-target="unset"
+          hx-target="body"
           class="pointer-events-auto flex flex-wrap gap-2 overflow-hidden leading-none hover:underline"
         >
           <span class="truncate">{{ playing_info.entity_title }}</span>
