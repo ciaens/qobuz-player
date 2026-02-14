@@ -1,6 +1,9 @@
 let evtSource;
 
 function initSse() {
+  if (evtSource) {
+    evtSource.close();
+  }
   evtSource = new EventSource("/sse");
 
   evtSource.addEventListener("reload", (_event) => {

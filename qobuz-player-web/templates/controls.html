@@ -1,5 +1,6 @@
 <div
   hx-get="/controls"
+  hx-swap="outerHTML"
   hx-trigger="tracklist"
   data-sse="tracklist"
   hx-target="this"
@@ -7,7 +8,7 @@
   <div class="h-16"></div>
   <div class="px-safe-offset-2 py-safe fixed right-0 bottom-14 left-0">
     <div
-      class="flex items-center justify-between gap-2 rounded-md bg-gray-900/70 p-2 backdrop-blur"
+      class="flex items-center justify-between gap-2 rounded-md bg-gray-900/70 p-2 backdrop-blur-md"
     >
       <a
         class="flex w-full items-center gap-2 overflow-hidden"

@@ -7,6 +7,8 @@
     <body
       class="touch-pan-y bg-black text-gray-50"
       hx-ext="preload, remove-me, morph"
+      hx-boost="true"
+      hx-swap="morph:innerHTML transition:true"
       hx-indicator="#loading-spinner"
     >
       <div
@@ -19,6 +21,7 @@
 
       <div
         id="toast-container"
+        hx-preserve
         class="fixed top-8 right-8 z-20 flex flex-col gap-4"
       ></div>
 
