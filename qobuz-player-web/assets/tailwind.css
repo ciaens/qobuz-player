@@ -124,6 +124,10 @@ body {
   .scrollbar-thumb-gray-700:hover::-webkit-scrollbar-thumb {
     background-color: #4b5563;
   }
+
+  .pt-safe-or-4 {
+    padding-top: max(env(safe-area-inset-top), 1rem);
+  }
 }
 
 @view-transition {
