@@ -6,6 +6,9 @@ An Adwaita-based Qobuz client.
 Listening to your Qobuz music with Qobine: an Adwaita Qobuz client designed for GNOME.
 
 ## Installation
+<div align="center">
+    <a href='https://flathub.org/en/apps/io.github.sofusa.qobine'><img width='130' alt='Download on Flathub' src='https://flathub.org/assets/badges/flathub-badge-en.png'/></a>
+</div>
 
 Qobine is available on Flathub. Install with flatpak:
 ```sh
