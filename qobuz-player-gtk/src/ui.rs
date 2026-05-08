@@ -16,6 +16,7 @@ pub mod grid_page;
 pub mod now_playing_bar;
 pub mod playlist_detail_page;
 pub mod playlists_page;
+pub mod preferences;
 pub mod search_page;
 
 pub fn set_image_from_url(url: Option<&str>, image: &Image) {

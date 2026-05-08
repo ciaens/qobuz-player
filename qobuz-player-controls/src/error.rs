@@ -67,6 +67,10 @@ pub enum Error {
     ConnectError {
         error: String,
     },
+    #[snafu(display("{error}"))]
+    StorageError {
+        error: String,
+    },
 }
 
 impl From<sqlx::migrate::MigrateError> for Error {

@@ -51,11 +51,12 @@ pub struct Client {
     max_audio_quality: AudioQuality,
 }
 
-#[derive(Clone, Copy, Debug, clap::ValueEnum)]
+#[derive(Default, Clone, Copy, Debug, clap::ValueEnum)]
 pub enum AudioQuality {
     Mp3 = 5,
     CD = 6,
     HIFI96 = 7,
+    #[default]
     HIFI192 = 27,
 }
 
@@ -67,6 +68,17 @@ impl Display for AudioQuality {
             AudioQuality::HIFI96 => "7",
             AudioQuality::HIFI192 => "27",
         })
+    }
+}
+
+impl AudioQuality {
+    pub fn to_label_str(&self) -> &str {
+        match self {
+            AudioQuality::Mp3 => "mp3",
+            AudioQuality::CD => "cd",
+            AudioQuality::HIFI96 => "hifi 96",
+            AudioQuality::HIFI192 => "hifi 192",
+        }
     }
 }
 

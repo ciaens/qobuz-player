@@ -4,6 +4,7 @@ use serde_json::to_string;
 use sqlx::types::Json;
 use sqlx::{Pool, Sqlite, SqlitePool, sqlite::SqliteConnectOptions};
 use std::path::{Path, PathBuf};
+use std::str::FromStr;
 
 pub struct Database {
     pool: Pool<Sqlite>,
@@ -96,23 +97,59 @@ impl Database {
     }
 
     pub async fn set_volume(&self, volume: f32) -> AppResult<()> {
-        sqlx::query!("delete from volume")
-            .execute(&self.pool)
-            .await?;
-
-        sqlx::query!("insert into volume (volume) values (?1)", volume)
-            .execute(&self.pool)
-            .await?;
+        sqlx::query!(
+            r#"
+            update configuration
+            set volume=?1
+            where rowid = 1
+            "#,
+            volume
+        )
+        .execute(&self.pool)
+        .await?;
 
         Ok(())
     }
 
-    pub async fn get_volume(&self) -> Option<f32> {
-        let row = sqlx::query_as!(VolumeDb, "select volume from volume")
-            .fetch_one(&self.pool)
-            .await;
+    pub async fn set_cache_directory(&self, directory: PathBuf) -> AppResult<()> {
+        let directory = directory
+            .canonicalize()
+            .map_err(|e| Error::StorageError {
+                error: e.to_string(),
+            })?
+            .into_os_string()
+            .into_string()
+            .map_err(|_| Error::StorageError {
+                error: "Error storing cache path".to_string(),
+            })?;
 
-        row.ok().map(|x| x.volume as f32)
+        sqlx::query!(
+            r#"
+            update configuration
+            set cache_directory=?1
+            where rowid = 1
+            "#,
+            directory
+        )
+        .execute(&self.pool)
+        .await?;
+
+        Ok(())
+    }
+
+    pub async fn set_cache_ttl_hours(&self, ttl: u32) -> AppResult<()> {
+        sqlx::query!(
+            r#"
+            update configuration
+            set cache_ttl_hours=?1
+            where rowid = 1
+            "#,
+            ttl
+        )
+        .execute(&self.pool)
+        .await?;
+
+        Ok(())
     }
 
     pub async fn set_max_audio_quality(&self, quality: AudioQuality) -> AppResult<()> {
@@ -151,13 +188,33 @@ impl Database {
         Ok(credentials)
     }
 
-    pub async fn get_configuration(&self) -> AppResult<DatabaseConfiguration> {
-        Ok(sqlx::query_as!(
+    pub async fn get_configuration(&self) -> AppResult<Configuration> {
+        let configuration = sqlx::query_as!(
             DatabaseConfiguration,
             "select * from configuration where rowid = 1"
         )
         .fetch_one(&self.pool)
-        .await?)
+        .await?;
+
+        let max_audio_quality = AudioQuality::from(configuration.max_audio_quality);
+        let cache_directory = configuration
+            .cache_directory
+            .and_then(|x| PathBuf::from_str(&x).ok())
+            .unwrap_or_else(|| {
+                let mut cache_dir = std::env::temp_dir();
+                cache_dir.push("qobuz-player-cache");
+                cache_dir
+            });
+
+        let cache_ttl_hours = configuration.cache_ttl_hours.unwrap_or(1) as u32;
+        let volume = configuration.volume.unwrap_or(1.0);
+
+        Ok(Configuration {
+            max_audio_quality,
+            cache_directory,
+            cache_ttl_hours,
+            volume: volume as f32,
+        })
     }
 
     pub async fn add_rfid_reference(
@@ -318,18 +375,24 @@ impl From<OAuthResult> for Credentials {
     }
 }
 
-pub struct DatabaseConfiguration {
-    pub max_audio_quality: Option<i64>,
+struct DatabaseConfiguration {
+    max_audio_quality: Option<i64>,
+    cache_directory: Option<String>,
+    cache_ttl_hours: Option<i64>,
+    volume: Option<f64>,
+}
+
+#[derive(Default)]
+pub struct Configuration {
+    pub max_audio_quality: AudioQuality,
+    pub cache_directory: PathBuf,
+    pub cache_ttl_hours: u32,
+    pub volume: f32,
 }
 
 #[derive(Debug, sqlx::FromRow, serde::Deserialize)]
 struct TracklistDb {
     tracklist: Json<Tracklist>,
-}
-
-#[derive(Debug, sqlx::FromRow, serde::Deserialize)]
-struct VolumeDb {
-    volume: f64,
 }
 
 async fn create_credentials_row(pool: &Pool<Sqlite>) -> AppResult<()> {

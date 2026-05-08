@@ -169,7 +169,7 @@ pub async fn default_audio_quality(
         Some(quality) => Ok(quality),
         None => {
             let database_configuration = database.get_configuration().await?;
-            Ok(database_configuration.max_audio_quality.into())
+            Ok(database_configuration.max_audio_quality)
         }
     }
 }
@@ -184,7 +184,12 @@ pub async fn create_player(
     output_device_id: Option<String>,
 ) -> AppResult<Player> {
     let tracklist = database.get_tracklist().await.unwrap_or_default();
-    let volume = database.get_volume().await.unwrap_or(1.0);
+    let volume = database
+        .get_configuration()
+        .await
+        .map(|x| x.volume)
+        .unwrap_or(1.0);
+
     let audio_cache = default_audio_cache(audio_cache);
 
     let state_change_delay = state_change_delay_ms.map(Duration::from_millis);

@@ -95,6 +95,7 @@ pub async fn run() -> AppResult<()> {
     let tracklist_receiver = player.tracklist();
     let status_receiver = player.status();
     let position_receiver = player.position();
+    let volume_receiver = player.volume();
     let database_clone = database.clone();
     tokio::task::spawn_blocking(move || {
         if let Err(e) = qobuz_player_gtk::init(
@@ -103,6 +104,7 @@ pub async fn run() -> AppResult<()> {
             tracklist_receiver,
             status_receiver,
             position_receiver,
+            volume_receiver,
             controls,
             database_clone,
             exit_sender,

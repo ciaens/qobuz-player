@@ -4,6 +4,7 @@ use adw::{Application, prelude::*};
 use libadwaita::{self as adw, ApplicationWindow};
 use qobuz_player_controls::{
     AppResult, ExitSender, PositionReceiver, Status, StatusReceiver, TracklistReceiver,
+    VolumeReceiver,
     client::{Client, exchange_oauth_code},
     controls::Controls,
     database::{Credentials, Database},
@@ -76,6 +77,7 @@ pub fn init(
     tracklist_receiver: TracklistReceiver,
     status_receiver: StatusReceiver,
     position_receiver: PositionReceiver,
+    volume_receiver: VolumeReceiver,
     controls: Controls,
     database: Arc<Database>,
     exit_sender: ExitSender,
@@ -94,8 +96,10 @@ pub fn init(
 
     let app_id_for_window = app_id.clone();
 
+    // TODO: use #[weak] to avoid clones?
     application.connect_activate({
         let client = client.clone();
+        let database = database.clone();
         let tracklist_receiver = tracklist_receiver.clone();
         let status_receiver = status_receiver.clone();
         let position_receiver = position_receiver.clone();
@@ -127,8 +131,10 @@ pub fn init(
                 tracklist_receiver.clone(),
                 status_receiver.clone(),
                 position_receiver.clone(),
+                volume_receiver.clone(),
                 controls.clone(),
                 client.clone(),
+                database.clone(),
                 exit_sender.clone(),
                 ui_sender.clone(),
                 ui_receiver
@@ -181,8 +187,10 @@ fn build_ui(
     tracklist_receiver: TracklistReceiver,
     status_receiver: StatusReceiver,
     position_receiver: PositionReceiver,
+    volume_receiver: VolumeReceiver,
     controls: Controls,
     client: Arc<Client>,
+    database: Arc<Database>,
     exit_sender: ExitSender,
     ui_sender: mpsc::UnboundedSender<UiEvent>,
     ui_receiver: mpsc::UnboundedReceiver<UiEvent>,
@@ -221,7 +229,12 @@ fn build_ui(
     let on_open_playlist = callback_handles.open_playlist.clone();
 
     let shell = AppShell::new(
+        app,
         client.clone(),
+        controls.clone(),
+        database,
+        volume_receiver,
+        exit_sender.clone(),
         on_open_album.clone(),
         on_open_artist.clone(),
         on_open_playlist.clone(),
@@ -294,6 +307,7 @@ fn setup_tracklist_listener(
                 }
                 Ok(exit) = exit_receiver.recv() => {
                     if exit {
+                        // TODO: Quit the app!
                         break;
                     }
                 }

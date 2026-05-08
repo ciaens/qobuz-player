@@ -4,11 +4,16 @@ use gtk4::glib;
 use gtk4::prelude::*;
 use libadwaita as adw;
 
+use qobuz_player_controls::ExitSender;
+use qobuz_player_controls::VolumeReceiver;
 use qobuz_player_controls::client::Client;
+use qobuz_player_controls::controls::Controls;
+use qobuz_player_controls::database::Database;
 
 use crate::ui::albums_page::{AlbumsPage, new_albums_page};
 use crate::ui::artists_page::{ArtistsPage, new_artists_page};
 use crate::ui::playlists_page::{PlaylistsPage, new_playlists_page};
+use crate::ui::preferences::build_preferences_menu;
 use crate::ui::search_page::SearchPage;
 use crate::ui::{
     album_detail_page::AlbumHeaderInfo, artist_detail_page::ArtistHeaderInfo,
@@ -26,8 +31,14 @@ pub struct AppShell {
 }
 
 impl AppShell {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
+        app: &libadwaita::Application,
         client: Arc<Client>,
+        controls: Controls,
+        database: Arc<Database>,
+        volume_receiver: VolumeReceiver,
+        exit_sender: ExitSender,
         on_open_album: Rc<dyn Fn(AlbumHeaderInfo)>,
         on_open_artist: Rc<dyn Fn(ArtistHeaderInfo)>,
         on_open_playlist: Rc<dyn Fn(PlaylistHeaderInfo)>,
@@ -176,7 +187,11 @@ impl AppShell {
             .tooltip_text("Search")
             .build();
 
+        let preferences_button =
+            build_preferences_menu(app, controls, database, volume_receiver, exit_sender);
+
         sidebar_header.pack_start(&search_button);
+        sidebar_header.pack_end(&preferences_button);
 
         let split_view = adw::NavigationSplitView::builder()
             .vexpand(true)
