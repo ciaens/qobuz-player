@@ -1,5 +1,6 @@
 use std::{cell::RefCell, collections::HashSet, rc::Rc, sync::Arc};
 
+use adw::prelude::*;
 use gtk4::prelude::*;
 use libadwaita as adw;
 
@@ -8,7 +9,7 @@ use qobuz_player_controls::{
 };
 
 use crate::{
-    UiEventSender,
+    UiEvent, UiEventSender,
     ui::{
         DetailPage, DetailPageType, build_track_row,
         detail_page::{DetailType, build_detail_header, build_detail_scaffold},
@@ -34,6 +35,7 @@ pub struct PlaylistDetailPage {
     cover: gtk4::Image,
     title: gtk4::Label,
     meta: gtk4::Label,
+    delete_button: gtk4::Button,
 
     tracks_list: gtk4::ListBox,
 
@@ -90,6 +92,63 @@ impl PlaylistDetailPage {
             }
         });
 
+        let delete_button = gtk4::Button::builder()
+            .label("Delete")
+            .icon_name("user-trash-symbolic")
+            .css_classes(vec!["destructive-action", "pill"])
+            .visible(false)
+            .build();
+
+        delete_button.connect_clicked({
+            let client = client.clone();
+            let ui_event_sender = ui_event_sender.clone();
+
+            move |button| {
+                let client = client.clone();
+                let button = button.clone();
+                let ui_event_sender = ui_event_sender.clone();
+
+                glib::MainContext::default().spawn_local(async move {
+                    let dialog = adw::AlertDialog::builder()
+                        .heading("Delete playlist?")
+                        .body("This playlist will be permanently deleted.")
+                        .build();
+
+                    dialog.add_responses(&[("cancel", "Cancel"), ("delete", "Delete")]);
+
+                    dialog.set_default_response(Some("cancel"));
+                    dialog.set_close_response("cancel");
+                    dialog.set_response_appearance("delete", adw::ResponseAppearance::Destructive);
+
+                    let response = dialog.choose_future(Some(&button)).await;
+
+                    if response.as_str() != "delete" {
+                        return;
+                    }
+
+                    button.set_sensitive(false);
+
+                    match client.delete_playlist(playlist_id).await {
+                        Ok(_) => {
+                            if let Some(nav_view) = button
+                                .ancestor(adw::NavigationView::static_type())
+                                .and_then(|w| w.downcast::<adw::NavigationView>().ok())
+                            {
+                                nav_view.pop();
+                            }
+                            if let Err(error) = ui_event_sender.send(UiEvent::FavoritesChanged) {
+                                tracing::error!("{error}")
+                            };
+                        }
+                        Err(err) => {
+                            tracing::error!("Failed to delete playlist {playlist_id}: {err}");
+                            button.set_sensitive(true);
+                        }
+                    }
+                });
+            }
+        });
+
         let header = build_detail_header(
             client.clone(),
             controls.clone(),
@@ -99,6 +158,7 @@ impl PlaylistDetailPage {
             vec![
                 play_button.clone().upcast(),
                 shuffle_button.clone().upcast(),
+                delete_button.clone().upcast(),
             ],
             DetailType::Playlist(playlist_id),
         );
@@ -137,6 +197,7 @@ impl PlaylistDetailPage {
             loaded: RefCell::new(false),
             current_selected_index: Rc::new(RefCell::new(None)),
             ui_event_sender,
+            delete_button,
         };
 
         s.load_playlist();
@@ -163,6 +224,8 @@ impl PlaylistDetailPage {
         let tracklist_receiver = self.tracklist_receiver.clone();
         let current_playing_index = self.current_selected_index.clone();
 
+        let delete_button = self.delete_button.clone();
+
         stack.set_visible_child_name("loading");
 
         glib::MainContext::default().spawn_local(async move {
@@ -174,6 +237,8 @@ impl PlaylistDetailPage {
                     meta.set_label(&dur_str.to_string());
 
                     set_image_from_url(playlist.image.as_deref(), &cover);
+
+                    delete_button.set_visible(playlist.is_owned);
 
                     clear_listbox(&tracks_list);
 
