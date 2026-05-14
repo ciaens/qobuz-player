@@ -5,6 +5,8 @@ use gtk4::glib;
 use gtk4::prelude::*;
 use libadwaita as adw;
 
+use adw::prelude::*;
+
 use qobuz_player_controls::ExitSender;
 use qobuz_player_controls::VolumeReceiver;
 use qobuz_player_controls::client::Client;
@@ -13,7 +15,6 @@ use qobuz_player_controls::database::Database;
 use qobuz_player_controls::tracklist::Tracklist;
 use tokio::sync::mpsc;
 
-use crate::UiEventSender;
 use crate::ui::albums_page::{AlbumsPage, new_albums_page};
 use crate::ui::artists_page::{ArtistsPage, new_artists_page};
 use crate::ui::favorite_tracks_page::FavoriteTracksPage;
@@ -25,12 +26,15 @@ use crate::ui::{
     album_detail_page::AlbumHeaderInfo, artist_detail_page::ArtistHeaderInfo,
     playlist_detail_page::PlaylistHeaderInfo,
 };
+use crate::{UiEvent, UiEventSender};
 
 const SIDEBAR_QUEUE: u32 = 0;
 const SIDEBAR_ALBUMS: u32 = 1;
 const SIDEBAR_ARTISTS: u32 = 2;
 const SIDEBAR_PLAYLISTS: u32 = 3;
 const SIDEBAR_TRACKS: u32 = 4;
+const SIDEBAR_CREATE_PLAYLIST: u32 = 5;
+const SIDEBAR_FAVORITE_PLAYLISTS_START: u32 = 6;
 
 pub struct AppShell {
     root: adw::NavigationSplitView,
@@ -42,6 +46,9 @@ pub struct AppShell {
     playlists_page: Rc<RefCell<PlaylistsPage>>,
     favorite_tracks_page: FavoriteTracksPage,
     queue_page: QueuePage,
+    favorite_playlists_section: adw::SidebarSection,
+    favorite_sidebar_playlists: Rc<RefCell<Vec<PlaylistHeaderInfo>>>,
+    favorite_playlist_items: Rc<RefCell<Vec<adw::SidebarItem>>>,
 }
 
 impl AppShell {
@@ -70,7 +77,7 @@ impl AppShell {
             client.clone(),
             on_open_album,
             on_open_artist,
-            on_open_playlist,
+            on_open_playlist.clone(),
         )));
 
         let stack = adw::ViewStack::builder()
@@ -147,8 +154,30 @@ impl AppShell {
                 .build(),
         );
 
+        // TODO: Add playlists to the sidebar in a playlist section
+        // Top entry should be a "Create playlist" where use can type the name of a playlist in the section.
+        // If hits "enter" just println the result for now.
+        // The entry should be playlist.title
+        // When clicked, it should use the on_open_playlist:
+        // on_open(PlaylistHeaderInfo { id: playlist.id })
+
+        let favorite_playlists_section = adw::SidebarSection::new();
+        favorite_playlists_section.set_title(Some("Playlists"));
+
+        favorite_playlists_section.append(
+            adw::SidebarItem::builder()
+                .title("Create new playlist")
+                .icon_name("list-add-symbolic")
+                .build(),
+        );
+
+        let favorite_sidebar_playlists = Rc::new(RefCell::new(Vec::<PlaylistHeaderInfo>::new()));
+
+        let favorite_playlist_items = Rc::new(RefCell::new(Vec::<adw::SidebarItem>::new()));
+
         sidebar.append(queue_section);
         sidebar.append(library_section);
+        sidebar.append(favorite_playlists_section.clone());
 
         let sidebar_header = adw::HeaderBar::new();
         sidebar_header.set_show_end_title_buttons(false);
@@ -293,6 +322,9 @@ impl AppShell {
         sidebar.connect_selected_notify({
             let stack = stack.clone();
             let search_button = search_button.clone();
+            let on_open_playlist = on_open_playlist.clone();
+            let favorite_sidebar_playlists = favorite_sidebar_playlists.clone();
+            let client = client.clone();
 
             move |sb| {
                 let idx = sb.selected();
@@ -309,6 +341,24 @@ impl AppShell {
                     SIDEBAR_ARTISTS => stack.set_visible_child_name("artists"),
                     SIDEBAR_PLAYLISTS => stack.set_visible_child_name("playlists"),
                     SIDEBAR_TRACKS => stack.set_visible_child_name("tracks"),
+
+                    // TODO: Select the previous selected on create and previous
+                    SIDEBAR_CREATE_PLAYLIST => {
+                        show_create_playlist_dialog(sb, client.clone(), ui_event_sender.clone());
+                    }
+
+                    idx if idx >= SIDEBAR_FAVORITE_PLAYLISTS_START => {
+                        let playlist_idx = (idx - SIDEBAR_FAVORITE_PLAYLISTS_START) as usize;
+
+                        if let Some(playlist) = favorite_sidebar_playlists
+                            .borrow()
+                            .get(playlist_idx)
+                            .cloned()
+                        {
+                            on_open_playlist(playlist);
+                        }
+                    }
+
                     _ => {}
                 }
             }
@@ -436,6 +486,9 @@ impl AppShell {
             playlists_page,
             queue_page,
             favorite_tracks_page,
+            favorite_playlists_section,
+            favorite_sidebar_playlists,
+            favorite_playlist_items,
         }
     }
 
@@ -453,6 +506,9 @@ impl AppShell {
             &self.playlists_page,
             &self.favorite_tracks_page,
             &self.queue_page,
+            &self.favorite_playlists_section,
+            &self.favorite_sidebar_playlists,
+            &self.favorite_playlist_items,
         );
     }
 
@@ -471,12 +527,19 @@ fn reload_favorites(
     playlists_page: &Rc<RefCell<PlaylistsPage>>,
     favorite_tracks_page: &FavoriteTracksPage,
     queue_page: &QueuePage,
+    favorite_playlists_section: &adw::SidebarSection,
+    favorite_sidebar_playlists: &Rc<RefCell<Vec<PlaylistHeaderInfo>>>,
+    favorite_playlist_items: &Rc<RefCell<Vec<adw::SidebarItem>>>,
 ) {
     let albums_page = albums_page.clone();
     let artists_page = artists_page.clone();
     let playlists_page = playlists_page.clone();
     let favorite_tracks_page = favorite_tracks_page.clone();
     let queue_page = queue_page.clone();
+
+    let favorite_playlists_section = favorite_playlists_section.clone();
+    let favorite_sidebar_playlists = favorite_sidebar_playlists.clone();
+    let favorite_playlist_items = favorite_playlist_items.clone();
 
     let spinner = spinner.clone();
     let waiting_label = waiting_label.clone();
@@ -490,6 +553,39 @@ fn reload_favorites(
             Ok(favorites) => {
                 spinner.set_visible(false);
                 spinner.stop();
+
+                let favorite_playlists: Vec<_> = favorites
+                    .playlists
+                    .iter()
+                    .filter(|playlist| playlist.is_owned)
+                    .map(|playlist| PlaylistHeaderInfo {
+                        id: playlist.id,
+                        // include other fields if required by your struct
+                    })
+                    .collect();
+
+                // Remove old dynamic playlist rows
+                for item in favorite_playlist_items.borrow_mut().drain(..) {
+                    favorite_playlists_section.remove(&item);
+                }
+
+                // Store callback data
+                favorite_sidebar_playlists.replace(favorite_playlists.clone());
+
+                // Add rows
+                for playlist in favorites
+                    .playlists
+                    .iter()
+                    .filter(|playlist| playlist.is_owned)
+                {
+                    let item = adw::SidebarItem::builder()
+                        .title(&playlist.title)
+                        .icon_name("view-list-symbolic")
+                        .build();
+
+                    favorite_playlists_section.append(item.clone());
+                    favorite_playlist_items.borrow_mut().push(item);
+                }
 
                 albums_page.borrow_mut().load(favorites.albums);
                 artists_page.borrow_mut().load(favorites.artists);
@@ -511,4 +607,144 @@ fn reload_favorites(
             }
         }
     });
+}
+
+fn show_create_playlist_dialog(
+    parent: &impl IsA<gtk4::Widget>,
+    client: Arc<Client>,
+    ui_event_sender: UiEventSender,
+) {
+    let dialog = adw::Dialog::builder()
+        .title("Create playlist")
+        .content_width(420)
+        .build();
+
+    let toolbar_view = adw::ToolbarView::new();
+
+    let header = adw::HeaderBar::new();
+
+    let cancel_button = gtk4::Button::builder()
+        .label("Cancel")
+        .css_classes(vec!["flat"])
+        .build();
+
+    let create_button = gtk4::Button::builder()
+        .label("Create")
+        .css_classes(vec!["suggested-action"])
+        .sensitive(false)
+        .build();
+
+    header.pack_start(&cancel_button);
+    header.pack_end(&create_button);
+
+    toolbar_view.add_top_bar(&header);
+
+    let content = gtk4::Box::builder()
+        .orientation(gtk4::Orientation::Vertical)
+        .spacing(12)
+        .margin_top(16)
+        .margin_bottom(16)
+        .margin_start(16)
+        .margin_end(16)
+        .build();
+
+    let name_row = adw::EntryRow::builder().title("Name").build();
+    let description_row = adw::EntryRow::builder().title("Description").build();
+
+    let private_row = adw::SwitchRow::builder().title("Private").build();
+
+    let collaborative_row = adw::SwitchRow::builder().title("Collaborative").build();
+
+    private_row.connect_active_notify({
+        let collaborative_row = collaborative_row.clone();
+
+        move |private_row| {
+            let is_private = private_row.is_active();
+
+            if is_private {
+                collaborative_row.set_active(false);
+            }
+
+            collaborative_row.set_sensitive(!is_private);
+        }
+    });
+
+    let form_group = adw::PreferencesGroup::new();
+
+    form_group.add(&name_row);
+    form_group.add(&description_row);
+    form_group.add(&private_row);
+    form_group.add(&collaborative_row);
+
+    content.append(&form_group);
+
+    toolbar_view.set_content(Some(&content));
+    dialog.set_child(Some(&toolbar_view));
+
+    name_row.connect_text_notify({
+        let create_button = create_button.clone();
+
+        move |row| {
+            create_button.set_sensitive(!row.text().trim().is_empty());
+        }
+    });
+
+    private_row.connect_active_notify({
+        let collaborative_row = collaborative_row.clone();
+
+        move |private_row| {
+            let is_private = private_row.is_active();
+
+            if is_private {
+                collaborative_row.set_active(false);
+            }
+
+            collaborative_row.set_sensitive(!is_private);
+        }
+    });
+
+    cancel_button.connect_clicked({
+        let dialog = dialog.clone();
+
+        move |_| {
+            dialog.close();
+        }
+    });
+
+    create_button.connect_clicked({
+        let dialog = dialog.clone();
+        let name_row = name_row.clone();
+        let description_row = description_row.clone();
+        let private_row = private_row.clone();
+        let collaborative_row = collaborative_row.clone();
+
+        move |_| {
+            let name = name_row.text().trim().to_string();
+            let description = description_row.text().trim().to_string();
+
+            let is_private = private_row.is_active();
+            let is_collaborative = collaborative_row.is_active();
+
+            glib::MainContext::default().spawn_local({
+                let client = client.clone();
+                let ui_event_sender = ui_event_sender.clone();
+                async move {
+                    if let Err(error) = client
+                        .create_playlist(name, !is_private, description, Some(is_collaborative))
+                        .await
+                    {
+                        tracing::error!("{error}")
+                    };
+
+                    if let Err(error) = ui_event_sender.send(UiEvent::FavoritesChanged) {
+                        tracing::error!("{error}")
+                    };
+                }
+            });
+
+            dialog.close();
+        }
+    });
+
+    dialog.present(Some(parent));
 }
