@@ -33,8 +33,6 @@ const SIDEBAR_ALBUMS: u32 = 1;
 const SIDEBAR_ARTISTS: u32 = 2;
 const SIDEBAR_PLAYLISTS: u32 = 3;
 const SIDEBAR_TRACKS: u32 = 4;
-const SIDEBAR_CREATE_PLAYLIST: u32 = 5;
-const SIDEBAR_FAVORITE_PLAYLISTS_START: u32 = 6;
 
 pub struct AppShell {
     root: adw::NavigationSplitView,
@@ -46,9 +44,6 @@ pub struct AppShell {
     playlists_page: Rc<RefCell<PlaylistsPage>>,
     favorite_tracks_page: FavoriteTracksPage,
     queue_page: QueuePage,
-    favorite_playlists_section: adw::SidebarSection,
-    favorite_sidebar_playlists: Rc<RefCell<Vec<PlaylistHeaderInfo>>>,
-    favorite_playlist_items: Rc<RefCell<Vec<adw::SidebarItem>>>,
 }
 
 impl AppShell {
@@ -154,31 +149,8 @@ impl AppShell {
                 .build(),
         );
 
-        // TODO: Add playlists to the sidebar in a playlist section
-        // Top entry should be a "Create playlist" where use can type the name of a playlist in the section.
-        // If hits "enter" just println the result for now.
-        // The entry should be playlist.title
-        // When clicked, it should use the on_open_playlist:
-        // on_open(PlaylistHeaderInfo { id: playlist.id })
-
-        let favorite_playlists_section = adw::SidebarSection::new();
-        favorite_playlists_section.set_title(Some("Playlists"));
-
-        favorite_playlists_section.append(
-            adw::SidebarItem::builder()
-                .title("Create new playlist")
-                .icon_name("list-add-symbolic")
-                .build(),
-        );
-
-        let favorite_sidebar_playlists = Rc::new(RefCell::new(Vec::<PlaylistHeaderInfo>::new()));
-
-        let favorite_playlist_items = Rc::new(RefCell::new(Vec::<adw::SidebarItem>::new()));
-
         sidebar.append(queue_section);
         sidebar.append(library_section);
-        sidebar.append(favorite_playlists_section.clone());
-
         let sidebar_header = adw::HeaderBar::new();
         sidebar_header.set_show_end_title_buttons(false);
 
@@ -197,6 +169,22 @@ impl AppShell {
             .visible(true)
             .build();
 
+        let create_playlist_button: gtk4::ToggleButton = gtk4::ToggleButton::builder()
+            .icon_name("list-add-symbolic")
+            .tooltip_text("New playlist")
+            .css_classes(vec!["flat"])
+            .visible(true)
+            .build();
+        create_playlist_button.connect_clicked({
+            let client = client.clone();
+            let ui_event_sender = ui_event_sender.clone();
+
+            move |tb| {
+                show_create_playlist_dialog(tb, client.clone(), ui_event_sender.clone());
+            }
+        });
+
+        content_header.pack_start(&create_playlist_button);
         content_header.pack_end(&filter_button);
 
         let filter_entry = gtk4::SearchEntry::builder()
@@ -322,9 +310,6 @@ impl AppShell {
         sidebar.connect_selected_notify({
             let stack = stack.clone();
             let search_button = search_button.clone();
-            let on_open_playlist = on_open_playlist.clone();
-            let favorite_sidebar_playlists = favorite_sidebar_playlists.clone();
-            let client = client.clone();
 
             move |sb| {
                 let idx = sb.selected();
@@ -341,23 +326,6 @@ impl AppShell {
                     SIDEBAR_ARTISTS => stack.set_visible_child_name("artists"),
                     SIDEBAR_PLAYLISTS => stack.set_visible_child_name("playlists"),
                     SIDEBAR_TRACKS => stack.set_visible_child_name("tracks"),
-
-                    // TODO: Select the previous selected on create and previous
-                    SIDEBAR_CREATE_PLAYLIST => {
-                        show_create_playlist_dialog(sb, client.clone(), ui_event_sender.clone());
-                    }
-
-                    idx if idx >= SIDEBAR_FAVORITE_PLAYLISTS_START => {
-                        let playlist_idx = (idx - SIDEBAR_FAVORITE_PLAYLISTS_START) as usize;
-
-                        if let Some(playlist) = favorite_sidebar_playlists
-                            .borrow()
-                            .get(playlist_idx)
-                            .cloned()
-                        {
-                            on_open_playlist(playlist);
-                        }
-                    }
 
                     _ => {}
                 }
@@ -383,6 +351,7 @@ impl AppShell {
                         filter_button.set_active(false);
                         filter_button.set_visible(false);
                         search_button.set_active(false);
+                        create_playlist_button.set_visible(false);
 
                         content_title.set_title("Queue");
                         content_header.set_title_widget(Some(&content_title));
@@ -394,6 +363,7 @@ impl AppShell {
                     "albums" => {
                         filter_button.set_visible(true);
                         search_button.set_active(false);
+                        create_playlist_button.set_visible(false);
 
                         content_title.set_title("Albums");
 
@@ -407,25 +377,10 @@ impl AppShell {
                             sidebar.set_selected(SIDEBAR_ALBUMS);
                         }
                     }
-                    "artists" => {
-                        filter_button.set_visible(true);
-                        search_button.set_active(false);
-
-                        content_title.set_title("Artists");
-
-                        if filter_button.is_active() {
-                            content_header.set_title_widget(Some(&filter_entry));
-                        } else {
-                            content_header.set_title_widget(Some(&content_title));
-                        }
-
-                        if sidebar.selected() != SIDEBAR_ARTISTS {
-                            sidebar.set_selected(SIDEBAR_ARTISTS);
-                        }
-                    }
                     "playlists" => {
                         filter_button.set_visible(true);
                         search_button.set_active(false);
+                        create_playlist_button.set_visible(true);
 
                         content_title.set_title("Playlists");
 
@@ -439,9 +394,27 @@ impl AppShell {
                             sidebar.set_selected(SIDEBAR_PLAYLISTS);
                         }
                     }
+                    "artists" => {
+                        filter_button.set_visible(true);
+                        search_button.set_active(false);
+                        create_playlist_button.set_visible(false);
+
+                        content_title.set_title("Artists");
+
+                        if filter_button.is_active() {
+                            content_header.set_title_widget(Some(&filter_entry));
+                        } else {
+                            content_header.set_title_widget(Some(&content_title));
+                        }
+
+                        if sidebar.selected() != SIDEBAR_ARTISTS {
+                            sidebar.set_selected(SIDEBAR_ARTISTS);
+                        }
+                    }
                     "tracks" => {
                         filter_button.set_visible(true);
                         search_button.set_active(false);
+                        create_playlist_button.set_visible(false);
 
                         content_title.set_title("Tracks");
 
@@ -458,6 +431,7 @@ impl AppShell {
                     "search" => {
                         filter_button.set_active(false);
                         filter_button.set_visible(false);
+                        create_playlist_button.set_visible(false);
 
                         content_title.set_title("Search");
                         content_header.set_title_widget(Some(&search_entry));
@@ -486,9 +460,6 @@ impl AppShell {
             playlists_page,
             queue_page,
             favorite_tracks_page,
-            favorite_playlists_section,
-            favorite_sidebar_playlists,
-            favorite_playlist_items,
         }
     }
 
@@ -506,9 +477,6 @@ impl AppShell {
             &self.playlists_page,
             &self.favorite_tracks_page,
             &self.queue_page,
-            &self.favorite_playlists_section,
-            &self.favorite_sidebar_playlists,
-            &self.favorite_playlist_items,
         );
     }
 
@@ -527,19 +495,12 @@ fn reload_favorites(
     playlists_page: &Rc<RefCell<PlaylistsPage>>,
     favorite_tracks_page: &FavoriteTracksPage,
     queue_page: &QueuePage,
-    favorite_playlists_section: &adw::SidebarSection,
-    favorite_sidebar_playlists: &Rc<RefCell<Vec<PlaylistHeaderInfo>>>,
-    favorite_playlist_items: &Rc<RefCell<Vec<adw::SidebarItem>>>,
 ) {
     let albums_page = albums_page.clone();
     let artists_page = artists_page.clone();
     let playlists_page = playlists_page.clone();
     let favorite_tracks_page = favorite_tracks_page.clone();
     let queue_page = queue_page.clone();
-
-    let favorite_playlists_section = favorite_playlists_section.clone();
-    let favorite_sidebar_playlists = favorite_sidebar_playlists.clone();
-    let favorite_playlist_items = favorite_playlist_items.clone();
 
     let spinner = spinner.clone();
     let waiting_label = waiting_label.clone();
@@ -553,39 +514,6 @@ fn reload_favorites(
             Ok(favorites) => {
                 spinner.set_visible(false);
                 spinner.stop();
-
-                let favorite_playlists: Vec<_> = favorites
-                    .playlists
-                    .iter()
-                    .filter(|playlist| playlist.is_owned)
-                    .map(|playlist| PlaylistHeaderInfo {
-                        id: playlist.id,
-                        // include other fields if required by your struct
-                    })
-                    .collect();
-
-                // Remove old dynamic playlist rows
-                for item in favorite_playlist_items.borrow_mut().drain(..) {
-                    favorite_playlists_section.remove(&item);
-                }
-
-                // Store callback data
-                favorite_sidebar_playlists.replace(favorite_playlists.clone());
-
-                // Add rows
-                for playlist in favorites
-                    .playlists
-                    .iter()
-                    .filter(|playlist| playlist.is_owned)
-                {
-                    let item = adw::SidebarItem::builder()
-                        .title(&playlist.title)
-                        .icon_name("view-list-symbolic")
-                        .build();
-
-                    favorite_playlists_section.append(item.clone());
-                    favorite_playlist_items.borrow_mut().push(item);
-                }
 
                 albums_page.borrow_mut().load(favorites.albums);
                 artists_page.borrow_mut().load(favorites.artists);
