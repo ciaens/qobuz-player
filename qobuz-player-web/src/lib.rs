@@ -306,7 +306,7 @@ pub struct Discover {
     pub playlists: Vec<(String, Vec<Playlist>)>,
 }
 
-type ResponseResult = std::result::Result<axum::response::Response, axum::response::Response>;
+type ResponseResult = Result<axum::response::Response, axum::response::Response>;
 
 #[allow(clippy::result_large_err)]
 fn ok_or_send_error_toast<T>(

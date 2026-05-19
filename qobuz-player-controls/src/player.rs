@@ -495,8 +495,6 @@ impl Player {
 
         tracklist.remove_track(index);
         self.update_queue(tracklist).await?;
-        let notification = Notification::Info("Queue updated".into());
-        self.broadcast.send(notification);
         Ok(())
     }
 
@@ -547,8 +545,6 @@ impl Player {
         tracklist.reorder_queue(new_order);
 
         self.update_queue(tracklist).await?;
-        let notification = Notification::Info("Queue updated".into());
-        self.broadcast.send(notification);
         Ok(())
     }
 

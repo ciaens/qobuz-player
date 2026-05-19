@@ -144,6 +144,7 @@ pub async fn handle_play_scan(
             if let TracklistType::Album(now_playing) = now_playing
                 && now_playing.id == id
             {
+                controls.play();
                 return;
             }
             controls.play_album(&id, 0);
@@ -152,6 +153,7 @@ pub async fn handle_play_scan(
             if let TracklistType::Playlist(now_playing) = now_playing
                 && now_playing.id == id
             {
+                controls.play();
                 return;
             }
             controls.play_playlist(id, 0, false);

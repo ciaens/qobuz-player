@@ -86,7 +86,12 @@ function updateSearchState(value) {
   history.replaceState(null, "", url.toString());
 
   const encoded = encodeURIComponent(value);
-  for (const id of ["albums-tab", "artists-tab", "playlists-tab", "tracks-tab"]) {
+  for (const id of [
+    "albums-tab",
+    "artists-tab",
+    "playlists-tab",
+    "tracks-tab",
+  ]) {
     const tab = document.getElementById(id);
     if (tab) {
       const section = id.replace("-tab", "");
@@ -111,11 +116,27 @@ function setSearchQuery(value) {
   searchTimeout = setTimeout(() => updateSearchState(value), 500);
 }
 
-htmx.onLoad(function (content) {
-  for (const sortable of content.querySelectorAll(".sortable")) {
+function initSortable(root = document) {
+  const sortables = [];
+
+  if (root.matches?.(".sortable")) {
+    sortables.push(root);
+  }
+
+  sortables.push(...root.querySelectorAll(".sortable"));
+
+  for (const sortable of sortables) {
+    if (Sortable.get(sortable)) {
+      continue;
+    }
+
     new Sortable(sortable, {
       animation: 150,
       handle: ".handle",
     });
   }
+}
+
+htmx.onLoad(function (content) {
+  initSortable(content);
 });
