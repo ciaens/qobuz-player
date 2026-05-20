@@ -27,48 +27,6 @@ use crate::{
 mod callbacks;
 mod ui;
 
-fn oauth_login_window(
-    app: &Application,
-    oauth_url: &str,
-    sender: tokio::sync::mpsc::UnboundedSender<String>,
-) {
-    let window = ApplicationWindow::builder()
-        .application(app)
-        .title("Sign in to Qobuz")
-        .default_width(480)
-        .default_height(720)
-        .build();
-
-    let webview = WebView::new();
-    webview.load_uri(oauth_url);
-
-    let window_weak = window.downgrade();
-
-    webview.connect_load_changed(move |webview, event| {
-        if event == webkit6::LoadEvent::Committed
-            && let Some(uri) = webview.uri()
-            && uri.starts_with("http://localhost/")
-            && let Some(code) = extract_code_from_uri(&uri)
-        {
-            sender.send(code).unwrap();
-
-            if let Some(window) = window_weak.upgrade() {
-                window.close();
-            }
-        }
-    });
-
-    window.set_content(Some(&webview));
-    window.present();
-}
-
-fn extract_code_from_uri(uri: &str) -> Option<String> {
-    let url = url::Url::parse(uri).ok()?;
-    url.query_pairs()
-        .find(|(k, _)| k == "code_autorisation")
-        .map(|(_, v)| v.to_string())
-}
-
 #[allow(clippy::too_many_arguments)]
 pub fn init(
     client: Arc<Client>,
@@ -109,7 +67,8 @@ pub fn init(
         let ui_sender = ui_sender.clone();
 
         move |app| {
-            if app.active_window().is_some() {
+            if let Some(window) = app.active_window() {
+                window.present();
                 return;
             }
 
@@ -204,6 +163,7 @@ fn build_ui(
         .title("Qobuz Player")
         .default_width(800)
         .default_height(1000)
+        .hide_on_close(true)
         .build();
 
     let app_nav = adw::NavigationView::new();
@@ -399,4 +359,46 @@ enum UiEvent {
     FavoritesChanged,
     Exit,
     Toast(String),
+}
+
+fn oauth_login_window(
+    app: &Application,
+    oauth_url: &str,
+    sender: tokio::sync::mpsc::UnboundedSender<String>,
+) {
+    let window = ApplicationWindow::builder()
+        .application(app)
+        .title("Sign in to Qobuz")
+        .default_width(480)
+        .default_height(720)
+        .build();
+
+    let webview = WebView::new();
+    webview.load_uri(oauth_url);
+
+    let window_weak = window.downgrade();
+
+    webview.connect_load_changed(move |webview, event| {
+        if event == webkit6::LoadEvent::Committed
+            && let Some(uri) = webview.uri()
+            && uri.starts_with("http://localhost/")
+            && let Some(code) = extract_code_from_uri(&uri)
+        {
+            sender.send(code).unwrap();
+
+            if let Some(window) = window_weak.upgrade() {
+                window.close();
+            }
+        }
+    });
+
+    window.set_content(Some(&webview));
+    window.present();
+}
+
+fn extract_code_from_uri(uri: &str) -> Option<String> {
+    let url = url::Url::parse(uri).ok()?;
+    url.query_pairs()
+        .find(|(k, _)| k == "code_autorisation")
+        .map(|(_, v)| v.to_string())
 }

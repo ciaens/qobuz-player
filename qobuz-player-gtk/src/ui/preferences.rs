@@ -16,6 +16,8 @@ use qobuz_player_controls::database::Configuration;
 use qobuz_player_controls::database::Database;
 use tokio::sync::mpsc;
 
+use crate::UiEventSender;
+
 pub fn build_preferences_menu(
     app: &adw::Application,
     controls: Controls,
@@ -23,9 +25,11 @@ pub fn build_preferences_menu(
     volume_receiver: VolumeReceiver,
     exit_sender: ExitSender,
     audio_cache_ttl_sender: mpsc::UnboundedSender<u32>,
+    ui_event_sender: UiEventSender,
 ) -> gtk::MenuButton {
     let menu = gio::Menu::new();
     menu.append(Some("Preferences"), Some("app.preferences"));
+    menu.append(Some("Quit"), Some("app.exit"));
 
     let menu_model = gtk::PopoverMenu::from_model(Some(&menu));
 
@@ -33,9 +37,19 @@ pub fn build_preferences_menu(
     button.set_icon_name("open-menu-symbolic");
     button.set_popover(Some(&menu_model));
 
-    let action = gio::SimpleAction::new("preferences", None);
+    let quit_action = gio::SimpleAction::new("exit", None);
 
-    action.connect_activate({
+    quit_action.connect_activate({
+        move |_, _| {
+            if let Err(error) = ui_event_sender.send(crate::UiEvent::Exit) {
+                tracing::error!("Error sending ui event: {error}");
+            };
+        }
+    });
+
+    let preferences_action = gio::SimpleAction::new("preferences", None);
+
+    preferences_action.connect_activate({
         clone!(
             #[weak]
             app,
@@ -61,7 +75,8 @@ pub fn build_preferences_menu(
             }
         )
     });
-    app.add_action(&action);
+    app.add_action(&preferences_action);
+    app.add_action(&quit_action);
 
     button
 }

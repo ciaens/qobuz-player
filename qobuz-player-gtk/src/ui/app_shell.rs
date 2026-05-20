@@ -256,6 +256,7 @@ impl AppShell {
             volume_receiver,
             exit_sender,
             audio_cache_ttl_sender,
+            ui_event_sender,
         );
 
         sidebar_header.pack_start(&search_button);
