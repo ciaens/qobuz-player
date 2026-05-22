@@ -39,7 +39,7 @@ pub struct Client {
     qobuz_client: OnceCell<RwLock<QobuzClient>>,
     credentials: Mutex<Option<Credentials>>,
     max_audio_quality: RwLock<AudioQuality>,
-    file_based_streaming: bool,
+    file_based_streaming: RwLock<bool>,
     favorites_cache: SimpleCache<Favorites>,
     featured_albums_cache: SimpleCache<Vec<(String, Vec<AlbumSimple>)>>,
     featured_playlists_cache: SimpleCache<Vec<(String, Vec<Playlist>)>>,
@@ -88,8 +88,8 @@ impl Client {
         Ok((client, oauth_result))
     }
 
-    pub fn file_based_streaming(&self) -> bool {
-        self.file_based_streaming
+    pub async fn file_based_streaming(&self) -> bool {
+        *self.file_based_streaming.read().await
     }
 
     pub fn new(
@@ -127,6 +127,7 @@ impl Client {
 
         let credentials = Mutex::new(credentials);
         let max_audio_quality = RwLock::new(max_audio_quality);
+        let file_based_streaming = RwLock::new(file_based_streaming);
 
         Self {
             qobuz_client: Default::default(),
@@ -157,12 +158,13 @@ impl Client {
         };
 
         let max_audio_quality = self.max_audio_quality.read().await;
+        let file_based_streaming = self.file_based_streaming.read().await;
 
         let client = QobuzClient::new(
             &credentials.user_auth_token,
             credentials.user_id,
             *max_audio_quality,
-            self.file_based_streaming,
+            *file_based_streaming,
         )
         .await?;
 
@@ -196,6 +198,11 @@ impl Client {
     pub async fn set_max_audio_quality(&self, new_quality: AudioQuality) {
         let mut max_audio_quality = self.max_audio_quality.write().await;
         *max_audio_quality = new_quality;
+    }
+
+    pub async fn use_file_based_streaming(&self, use_file_based_streaming: bool) {
+        let mut file_based_streaming = self.file_based_streaming.write().await;
+        *file_based_streaming = use_file_based_streaming;
     }
 
     pub async fn get_streaming_info(&self, track_id: u32) -> Result<TrackInfo> {

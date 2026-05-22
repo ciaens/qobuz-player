@@ -32,7 +32,7 @@ impl Downloader {
     }
 
     pub async fn ensure_track_is_downloaded(&mut self, track: &Track) -> AppResult<DownloadResult> {
-        if self.client.file_based_streaming() {
+        if self.client.file_based_streaming().await {
             return self.ensure_track_is_downloaded_file_based(track).await;
         }
 

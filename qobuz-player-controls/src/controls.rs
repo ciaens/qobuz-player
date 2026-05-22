@@ -65,6 +65,9 @@ pub enum ControlCommand {
     SetAudioCacheDirectory {
         new_directory: PathBuf,
     },
+    UseFileBasedStreaming {
+        use_file_based_streaming: bool,
+    },
 }
 
 #[derive(Debug, Clone)]
@@ -202,6 +205,14 @@ impl Controls {
     pub fn set_audio_max_quality(&self, new_quality: AudioQuality) {
         self.tx
             .send(ControlCommand::SetMaxAudioQuality { new_quality })
+            .expect("infallible");
+    }
+
+    pub fn set_use_file_based_streaming(&self, use_file_based_streaming: bool) {
+        self.tx
+            .send(ControlCommand::UseFileBasedStreaming {
+                use_file_based_streaming,
+            })
             .expect("infallible");
     }
 

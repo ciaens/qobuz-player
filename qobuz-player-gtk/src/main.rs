@@ -36,7 +36,7 @@ pub async fn run() -> AppResult<()> {
     let client = Arc::new(Client::new(
         credentials,
         configuration.max_audio_quality,
-        false, // TODO: Add preferences for file based streaming
+        configuration.use_file_based_streaming,
     ));
 
     let broadcast = Arc::new(NotificationBroadcast::new());

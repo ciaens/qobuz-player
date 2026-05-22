@@ -648,6 +648,17 @@ impl Player {
                 self.database.set_max_audio_quality(new_quality).await?;
                 self.client.set_max_audio_quality(new_quality).await;
             }
+            ControlCommand::UseFileBasedStreaming {
+                use_file_based_streaming,
+            } => {
+                tracing::info!("Using file based streaming: {use_file_based_streaming}");
+                self.database
+                    .set_use_file_based_streaming(use_file_based_streaming)
+                    .await?;
+                self.client
+                    .use_file_based_streaming(use_file_based_streaming)
+                    .await;
+            }
         }
         Ok(())
     }

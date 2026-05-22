@@ -283,6 +283,19 @@ fn audio_group(
 
     group.add(&quality);
 
+    let file_based_streaming = adw::SwitchRow::new();
+    file_based_streaming.set_title("Use file based streaming");
+    file_based_streaming.set_active(configuration.use_file_based_streaming);
+
+    file_based_streaming.connect_active_notify({
+        let controls = controls.clone();
+        move |row| {
+            controls.set_use_file_based_streaming(row.is_active());
+        }
+    });
+
+    group.add(&file_based_streaming);
+
     let volume = adw::ActionRow::new();
     volume.set_title("Volume");
 

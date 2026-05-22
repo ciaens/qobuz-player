@@ -152,6 +152,24 @@ impl Database {
         Ok(())
     }
 
+    pub async fn set_use_file_based_streaming(
+        &self,
+        use_file_based_streaming: bool,
+    ) -> AppResult<()> {
+        sqlx::query!(
+            r#"
+            update configuration
+            set use_file_based_streaming=?1
+            where rowid = 1
+            "#,
+            use_file_based_streaming
+        )
+        .execute(&self.pool)
+        .await?;
+
+        Ok(())
+    }
+
     pub async fn set_max_audio_quality(&self, quality: AudioQuality) -> AppResult<()> {
         let quality_id = quality as i32;
 
@@ -191,7 +209,7 @@ impl Database {
     pub async fn get_configuration(&self) -> AppResult<Configuration> {
         let configuration = sqlx::query_as!(
             DatabaseConfiguration,
-            "select cache_directory, cache_ttl_hours, volume, max_audio_quality from configuration where rowid = 1"
+            "select cache_directory, cache_ttl_hours, volume, max_audio_quality, use_file_based_streaming from configuration where rowid = 1"
         )
         .fetch_one(&self.pool)
         .await?;
@@ -208,11 +226,13 @@ impl Database {
 
         let cache_ttl_hours = configuration.cache_ttl_hours.unwrap_or(1) as u32;
         let volume = configuration.volume.unwrap_or(1.0);
+        let use_file_based_streaming = configuration.use_file_based_streaming.unwrap_or(false);
 
         Ok(Configuration {
             max_audio_quality,
             cache_directory,
             cache_ttl_hours,
+            use_file_based_streaming,
             volume: volume as f32,
         })
     }
@@ -380,11 +400,13 @@ struct DatabaseConfiguration {
     cache_directory: Option<String>,
     cache_ttl_hours: Option<i64>,
     volume: Option<f64>,
+    use_file_based_streaming: Option<bool>,
 }
 
 #[derive(Default, Debug)]
 pub struct Configuration {
     pub max_audio_quality: AudioQuality,
+    pub use_file_based_streaming: bool,
     pub cache_directory: PathBuf,
     pub cache_ttl_hours: u32,
     pub volume: f32,
