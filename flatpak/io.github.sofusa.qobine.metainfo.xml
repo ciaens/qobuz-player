@@ -64,6 +64,11 @@
   <url type="vcs-browser">https://github.com/SofusA/qobine/qobuz-player-gtk</url>
 
   <releases>
+    <release version="2026-05-29" date="2026-05-29">
+      <description>
+        <p>Added discover page</p>
+      </description>
+    </release>
     <release version="2026-05-18" date="2026-05-18">
       <description>
         <p>Added playlist operations</p>
