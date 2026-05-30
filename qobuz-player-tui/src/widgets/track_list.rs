@@ -13,7 +13,10 @@ use ratatui::{
 use crate::{
     app::{FilteredListState, NotificationList, Output},
     popup::Popup,
-    ui::{COLUMN_SPACING, HIGHLIGHT_STYLE, fetch_image, format_duration, mark_explicit_and_hifi},
+    ui::{
+        COLUMN_SPACING, HIGHLIGHT_STYLE, SELECTED_STYLE, fetch_image, format_duration,
+        mark_explicit_and_hifi,
+    },
 };
 
 #[derive(Default)]
@@ -41,8 +44,8 @@ impl TrackList {
         Self { items: tracks }
     }
 
-    pub fn render(&mut self, area: Rect, buf: &mut Buffer, show_album: bool) {
-        let table = track_table(self.items.filter(), show_album);
+    pub fn render(&mut self, area: Rect, buf: &mut Buffer, show_album: bool, focus: bool) {
+        let table = track_table(self.items.filter(), show_album, focus);
         table.render(area, buf, &mut self.items.state);
     }
 
@@ -216,7 +219,7 @@ impl TrackList {
     }
 }
 
-fn track_table<'a>(rows: &[Track], show_album: bool) -> Table<'a> {
+fn track_table<'a>(rows: &[Track], show_album: bool, focus: bool) -> Table<'a> {
     let body_rows: Vec<Row<'a>> = rows
         .iter()
         .map(|track| {
@@ -258,7 +261,11 @@ fn track_table<'a>(rows: &[Track], show_album: bool) -> Table<'a> {
     };
 
     let mut table = Table::new(body_rows, constraints)
-        .row_highlight_style(HIGHLIGHT_STYLE)
+        .row_highlight_style(if focus {
+            HIGHLIGHT_STYLE
+        } else {
+            SELECTED_STYLE
+        })
         .column_spacing(COLUMN_SPACING);
 
     if !is_empty {

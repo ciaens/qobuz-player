@@ -16,7 +16,7 @@ use crate::{
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub enum DiscoverFocus {
+enum DiscoverFocus {
     #[default]
     Sidebar,
     Content,
@@ -110,10 +110,12 @@ impl DiscoverState {
 
         frame.render_stateful_widget(sidebar, chunks[0], &mut sidebar_state);
 
+        let content_focused = self.focus == DiscoverFocus::Content;
+
         if let Some((_, list)) = self.selected_album_mut() {
-            list.render(chunks[1], frame.buffer_mut());
+            list.render(chunks[1], frame.buffer_mut(), content_focused);
         } else if let Some((_, list)) = self.selected_playlist_mut() {
-            list.render(chunks[1], frame.buffer_mut());
+            list.render(chunks[1], frame.buffer_mut(), content_focused);
         }
     }
 

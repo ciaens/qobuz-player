@@ -33,13 +33,14 @@ impl ArtistList {
         Self { items: artists }
     }
 
-    pub fn render(&mut self, area: Rect, buf: &mut Buffer) {
+    pub fn render(&mut self, area: Rect, buf: &mut Buffer, focus: bool) {
         let table = basic_list_table(
             self.items
                 .filter()
                 .iter()
                 .map(|artist| Row::new(Line::from(artist.name.clone())))
                 .collect::<Vec<_>>(),
+            focus,
         );
 
         table.render(area, buf, &mut self.items.state);

@@ -227,12 +227,13 @@ impl GenresState {
 
         frame.render_stateful_widget(sidebar, content_chunks[0], &mut sidebar_state);
 
+        let content_focused = self.focus == GenresFocus::Content;
         match self.selected_mut() {
             Some(Selected::Album(list)) => {
-                list.render(content_chunks[1], frame.buffer_mut());
+                list.render(content_chunks[1], frame.buffer_mut(), content_focused);
             }
             Some(Selected::Playlist(list)) => {
-                list.render(content_chunks[1], frame.buffer_mut());
+                list.render(content_chunks[1], frame.buffer_mut(), content_focused);
             }
             None => {}
         }

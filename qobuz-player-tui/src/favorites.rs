@@ -19,21 +19,21 @@ use crate::{
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub enum FavoritesFocus {
+enum FavoritesFocus {
     #[default]
     Sidebar,
     Content,
 }
 
 pub struct FavoritesState {
-    pub editing: bool,
     pub filter: Input,
     pub albums: AlbumList,
     pub artists: ArtistList,
     pub playlists: PlaylistList,
     pub tracks: TrackList,
-    pub sub_tab: SubTab,
-    pub focus: FavoritesFocus,
+    editing: bool,
+    sub_tab: SubTab,
+    focus: FavoritesFocus,
 }
 
 impl FavoritesState {
@@ -85,11 +85,22 @@ impl FavoritesState {
 
         frame.render_stateful_widget(sidebar, chunks[0], &mut sidebar_state);
 
+        let content_focused = self.focus == FavoritesFocus::Content;
         match self.sub_tab {
-            SubTab::Albums => self.albums.render(chunks[1], frame.buffer_mut()),
-            SubTab::Artists => self.artists.render(chunks[1], frame.buffer_mut()),
-            SubTab::Playlists => self.playlists.render(chunks[1], frame.buffer_mut()),
-            SubTab::Tracks => self.tracks.render(chunks[1], frame.buffer_mut(), true),
+            SubTab::Albums => self
+                .albums
+                .render(chunks[1], frame.buffer_mut(), content_focused),
+            SubTab::Artists => self
+                .artists
+                .render(chunks[1], frame.buffer_mut(), content_focused),
+            SubTab::Playlists => {
+                self.playlists
+                    .render(chunks[1], frame.buffer_mut(), content_focused)
+            }
+            SubTab::Tracks => {
+                self.tracks
+                    .render(chunks[1], frame.buffer_mut(), true, content_focused)
+            }
         };
     }
 

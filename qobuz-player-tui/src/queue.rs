@@ -54,6 +54,7 @@ impl QueueState {
                     ]))
                 })
                 .collect(),
+            true,
         )
         .block(block(None));
 

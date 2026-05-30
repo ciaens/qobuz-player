@@ -13,7 +13,10 @@ use ratatui::{
 use crate::{
     app::{FilteredListState, NotificationList, Output},
     popup::{AlbumPopupState, Popup},
-    ui::{COLUMN_SPACING, HIGHLIGHT_STYLE, fetch_image, format_duration, mark_explicit_and_hifi},
+    ui::{
+        COLUMN_SPACING, HIGHLIGHT_STYLE, SELECTED_STYLE, fetch_image, format_duration,
+        mark_explicit_and_hifi,
+    },
 };
 
 #[derive(Default)]
@@ -33,8 +36,8 @@ impl AlbumList {
         Self { items: albums }
     }
 
-    pub fn render(&mut self, area: Rect, buf: &mut Buffer) {
-        let table = album_table(self.items.filter());
+    pub fn render(&mut self, area: Rect, buf: &mut Buffer, focus: bool) {
+        let table = album_table(self.items.filter(), focus);
         table.render(area, buf, &mut self.items.state);
     }
 
@@ -154,6 +157,7 @@ impl AlbumList {
 
                     return Ok(Output::Popup(Popup::AlbumInfo(album, false, image)));
                 }
+
                 Ok(Output::Consumed)
             }
 
@@ -169,6 +173,7 @@ impl AlbumList {
 
                     return Ok(Output::Popup(Popup::Album(AlbumPopupState::new(album))));
                 }
+
                 Ok(Output::Consumed)
             }
 
@@ -177,7 +182,7 @@ impl AlbumList {
     }
 }
 
-pub fn album_table<'a>(rows: &[AlbumSimple]) -> Table<'a> {
+pub fn album_table<'a>(rows: &[AlbumSimple], focus: bool) -> Table<'a> {
     let body_rows: Vec<Row<'a>> = rows
         .iter()
         .map(|album| {
@@ -200,7 +205,11 @@ pub fn album_table<'a>(rows: &[AlbumSimple]) -> Table<'a> {
     ];
 
     let mut table = Table::new(body_rows, constraints)
-        .row_highlight_style(HIGHLIGHT_STYLE)
+        .row_highlight_style(if focus {
+            HIGHLIGHT_STYLE
+        } else {
+            SELECTED_STYLE
+        })
         .column_spacing(COLUMN_SPACING);
 
     if !is_empty {

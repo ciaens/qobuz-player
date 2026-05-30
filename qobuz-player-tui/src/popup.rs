@@ -294,7 +294,7 @@ impl Popup {
                 frame.render_widget(&block, area);
                 state
                     .tracks
-                    .render(block.inner(area), frame.buffer_mut(), false);
+                    .render(block.inner(area), frame.buffer_mut(), false, true);
             }
             Popup::Artist(artist) => {
                 let visible_rows = (artist.current_row_count() + 1).min(15) as u16;
@@ -329,10 +329,10 @@ impl Popup {
                 if let Some(state) = artist.current_state_mut() {
                     match state {
                         SelectedArtistPopupSubtabMut::Albums(album_list) => {
-                            album_list.render(chunks[1], frame.buffer_mut())
+                            album_list.render(chunks[1], frame.buffer_mut(), true)
                         }
                         SelectedArtistPopupSubtabMut::TopTracks(track_list) => {
-                            track_list.render(chunks[1], frame.buffer_mut(), true)
+                            track_list.render(chunks[1], frame.buffer_mut(), true, true)
                         }
                     }
                 }
@@ -373,7 +373,7 @@ impl Popup {
 
                 playlist_state
                     .tracks
-                    .render(chunks[0], frame.buffer_mut(), true);
+                    .render(chunks[0], frame.buffer_mut(), true, true);
                 frame.render_widget(buttons, chunks[2]);
             }
             Popup::Track(track_state) => {
@@ -390,7 +390,7 @@ impl Popup {
                 frame.render_widget(&block, area);
                 track_state
                     .playlists
-                    .render(block.inner(area), frame.buffer_mut());
+                    .render(block.inner(area), frame.buffer_mut(), true);
             }
             Popup::NewPlaylist(state) => {
                 let area = center(

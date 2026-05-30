@@ -14,7 +14,10 @@ use ratatui::{
 use crate::{
     app::{FilteredListState, NotificationList, Output},
     popup::{DeletePlaylistPopupState, NewPlaylistPopupState, PlaylistPopupState, Popup},
-    ui::{COLUMN_SPACING, HIGHLIGHT_STYLE, fetch_image, format_duration, mark_as_owned},
+    ui::{
+        COLUMN_SPACING, HIGHLIGHT_STYLE, SELECTED_STYLE, fetch_image, format_duration,
+        mark_as_owned,
+    },
 };
 
 #[derive(Default)]
@@ -35,8 +38,8 @@ impl PlaylistList {
         Self { items: playlists }
     }
 
-    pub fn render(&mut self, area: Rect, buf: &mut Buffer) {
-        let table = playlist_list(self.items.filter());
+    pub fn render(&mut self, area: Rect, buf: &mut Buffer, focus: bool) {
+        let table = playlist_list(self.items.filter(), focus);
         table.render(area, buf, &mut self.items.state);
     }
 
@@ -211,7 +214,7 @@ impl PlaylistList {
     }
 }
 
-fn playlist_list<'a>(rows: &[PlaylistSimple]) -> Table<'a> {
+fn playlist_list<'a>(rows: &[PlaylistSimple], focus: bool) -> Table<'a> {
     let body_rows: Vec<Row<'a>> = rows
         .iter()
         .map(|playlist| {
@@ -227,7 +230,11 @@ fn playlist_list<'a>(rows: &[PlaylistSimple]) -> Table<'a> {
     let constraints = [Constraint::Ratio(2, 3), Constraint::Length(10)];
 
     let mut table = Table::new(body_rows, constraints)
-        .row_highlight_style(HIGHLIGHT_STYLE)
+        .row_highlight_style(if focus {
+            HIGHLIGHT_STYLE
+        } else {
+            SELECTED_STYLE
+        })
         .column_spacing(COLUMN_SPACING);
 
     if !is_empty {

@@ -275,9 +275,13 @@ pub fn block(title: Option<&str>) -> Block<'_> {
     block
 }
 
-pub fn basic_list_table<'a>(rows: Vec<Row<'a>>) -> Table<'a> {
+pub fn basic_list_table<'a>(rows: Vec<Row<'a>>, focus: bool) -> Table<'a> {
     Table::new(rows, [Constraint::Min(1)])
-        .row_highlight_style(HIGHLIGHT_STYLE)
+        .row_highlight_style(if focus {
+            HIGHLIGHT_STYLE
+        } else {
+            SELECTED_STYLE
+        })
         .column_spacing(COLUMN_SPACING)
 }
 

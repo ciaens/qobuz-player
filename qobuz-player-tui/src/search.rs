@@ -23,18 +23,18 @@ pub enum SearchFocus {
     #[default]
     Sidebar,
     Content,
+    Editing,
 }
 
 #[derive(Default)]
 pub struct SearchState {
-    pub editing: bool,
-    pub filter: Input,
-    pub albums: AlbumList,
-    pub artists: ArtistList,
-    pub playlists: PlaylistList,
-    pub tracks: TrackList,
-    pub sub_tab: SubTab,
-    pub focus: SearchFocus,
+    filter: Input,
+    albums: AlbumList,
+    artists: ArtistList,
+    playlists: PlaylistList,
+    tracks: TrackList,
+    sub_tab: SubTab,
+    focus: SearchFocus,
 }
 
 impl SearchState {
@@ -45,7 +45,7 @@ impl SearchState {
 
         render_input(
             &self.filter,
-            self.editing,
+            self.focus == SearchFocus::Editing,
             tab_content_area_split[0],
             frame,
             "Search",
@@ -69,12 +69,28 @@ impl SearchState {
 
         frame.render_stateful_widget(sidebar, chunks[0], &mut sidebar_state);
 
+        let content_focused = self.focus == SearchFocus::Content;
+
         match self.sub_tab {
-            SubTab::Albums => self.albums.render(chunks[1], frame.buffer_mut()),
-            SubTab::Artists => self.artists.render(chunks[1], frame.buffer_mut()),
-            SubTab::Playlists => self.playlists.render(chunks[1], frame.buffer_mut()),
-            SubTab::Tracks => self.tracks.render(chunks[1], frame.buffer_mut(), true),
+            SubTab::Albums => self
+                .albums
+                .render(chunks[1], frame.buffer_mut(), content_focused),
+            SubTab::Artists => self
+                .artists
+                .render(chunks[1], frame.buffer_mut(), content_focused),
+            SubTab::Playlists => {
+                self.playlists
+                    .render(chunks[1], frame.buffer_mut(), content_focused)
+            }
+            SubTab::Tracks => {
+                self.tracks
+                    .render(chunks[1], frame.buffer_mut(), true, content_focused)
+            }
         };
+    }
+
+    pub fn focus_editing(&mut self) {
+        self.focus = SearchFocus::Editing;
     }
 
     pub async fn handle_events(
@@ -85,54 +101,49 @@ impl SearchState {
         notifications: &mut NotificationList,
     ) -> AppResult<Output> {
         match event {
-            Event::Key(key_event) if key_event.kind == KeyEventKind::Press => match self.editing {
-                false => match key_event.code {
-                    KeyCode::Char('e') => {
-                        self.start_editing();
-                        Ok(Output::Consumed)
-                    }
-                    _ => match self.focus {
-                        SearchFocus::Sidebar => match key_event.code {
-                            KeyCode::Up | KeyCode::Char('k') => {
-                                self.cycle_subtab_backwards();
-                                Ok(Output::Consumed)
-                            }
-                            KeyCode::Down | KeyCode::Char('j') => {
-                                self.cycle_subtab();
-                                Ok(Output::Consumed)
-                            }
-                            KeyCode::Right | KeyCode::Char('l') | KeyCode::Enter => {
-                                self.focus = SearchFocus::Content;
-                                Ok(Output::Consumed)
-                            }
-                            _ => Ok(Output::NotConsumed),
-                        },
-                        SearchFocus::Content => match key_event.code {
-                            KeyCode::Left | KeyCode::Char('h') => {
-                                self.focus = SearchFocus::Sidebar;
-                                Ok(Output::Consumed)
-                            }
-                            _ => {
-                                self.handle_content_events(
-                                    key_event.code,
-                                    client,
-                                    controls,
-                                    notifications,
-                                )
-                                .await
-                            }
-                        },
-                    },
-                },
-                true => match key_event.code {
+            Event::Key(key_event) if key_event.kind == KeyEventKind::Press => match self.focus {
+                SearchFocus::Editing => match key_event.code {
                     KeyCode::Esc | KeyCode::Enter => {
-                        self.stop_editing();
+                        self.focus = SearchFocus::Sidebar;
                         self.update_search(client).await?;
                         Ok(Output::Consumed)
                     }
                     _ => {
                         self.filter.handle_event(&event);
                         Ok(Output::Consumed)
+                    }
+                },
+                SearchFocus::Sidebar => match key_event.code {
+                    KeyCode::Char('e') => {
+                        self.focus_editing();
+                        Ok(Output::Consumed)
+                    }
+                    KeyCode::Up | KeyCode::Char('k') => {
+                        self.cycle_subtab_backwards();
+                        Ok(Output::Consumed)
+                    }
+                    KeyCode::Down | KeyCode::Char('j') => {
+                        self.cycle_subtab();
+                        Ok(Output::Consumed)
+                    }
+                    KeyCode::Right | KeyCode::Char('l') | KeyCode::Enter => {
+                        self.focus = SearchFocus::Content;
+                        Ok(Output::Consumed)
+                    }
+                    _ => Ok(Output::NotConsumed),
+                },
+                SearchFocus::Content => match key_event.code {
+                    KeyCode::Char('e') => {
+                        self.focus_editing();
+                        Ok(Output::Consumed)
+                    }
+                    KeyCode::Left | KeyCode::Char('h') => {
+                        self.focus = SearchFocus::Sidebar;
+                        Ok(Output::Consumed)
+                    }
+                    _ => {
+                        self.handle_content_events(key_event.code, client, controls, notifications)
+                            .await
                     }
                 },
             },
@@ -203,14 +214,6 @@ impl SearchState {
         }
 
         Ok(())
-    }
-
-    fn start_editing(&mut self) {
-        self.editing = true;
-    }
-
-    fn stop_editing(&mut self) {
-        self.editing = false;
     }
 
     fn cycle_subtab_backwards(&mut self) {
