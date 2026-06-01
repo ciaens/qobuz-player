@@ -44,6 +44,7 @@ impl NowPlayingBar {
             .wrap(false)
             .xalign(0.5)
             .css_classes(vec!["title-3"])
+            .max_width_chars(30)
             .build();
 
         let subtitle_box = gtk::Box::builder()
