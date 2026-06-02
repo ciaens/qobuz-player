@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE credentials SET user_auth_token = ?, user_id = ? WHERE rowid = 1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "2df20ff544e33d0cadcf662da94524506568f0d25f6ca3f75a3a2db4e7d96fd8"
+}

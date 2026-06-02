@@ -50,17 +50,18 @@ impl Database {
         Ok(Self { pool })
     }
 
-    pub async fn set_credentials(&self, credentials: Credentials) -> AppResult<()> {
-        let token = credentials.user_auth_token;
-        let user_id = credentials.user_id;
+    pub async fn set_credentials(&self, credentials: Option<Credentials>) -> AppResult<()> {
+        let token = credentials.as_ref().map(|c| c.user_auth_token.clone());
+        let user_id = credentials.as_ref().map(|c| c.user_id);
 
         sqlx::query!(
-            "update credentials set user_auth_token = ?, user_id = ? where rowid = 1",
+            "UPDATE credentials SET user_auth_token = ?, user_id = ? WHERE rowid = 1",
             token,
             user_id
         )
         .execute(&self.pool)
         .await?;
+
         Ok(())
     }
 

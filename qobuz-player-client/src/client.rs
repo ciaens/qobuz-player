@@ -61,17 +61,6 @@ pub enum AudioQuality {
     HIFI192 = 27,
 }
 
-impl Display for AudioQuality {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(match self {
-            AudioQuality::Mp3 => "5",
-            AudioQuality::CD => "6",
-            AudioQuality::HIFI96 => "7",
-            AudioQuality::HIFI192 => "27",
-        })
-    }
-}
-
 impl AudioQuality {
     pub fn to_label_str(&self) -> &str {
         match self {
@@ -80,6 +69,17 @@ impl AudioQuality {
             AudioQuality::HIFI96 => "hifi 96",
             AudioQuality::HIFI192 => "hifi 192",
         }
+    }
+}
+
+impl Display for AudioQuality {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            AudioQuality::Mp3 => "5",
+            AudioQuality::CD => "6",
+            AudioQuality::HIFI96 => "7",
+            AudioQuality::HIFI192 => "27",
+        })
     }
 }
 

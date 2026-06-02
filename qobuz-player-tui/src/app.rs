@@ -4,6 +4,7 @@ use crate::{
     genres::GenresState,
     now_playing::NowPlayingState,
     popup::{Popup, TrackPopupState},
+    preferences::PreferencesState,
     queue::QueueState,
     search::SearchState,
     ui::fetch_image,
@@ -64,6 +65,7 @@ pub struct App {
     pub queue: QueueState,
     pub discover: DiscoverState,
     pub genres: GenresState,
+    pub preferences: PreferencesState,
     pub broadcast: Arc<NotificationBroadcast>,
     pub notifications: NotificationList,
     pub full_screen: bool,
@@ -77,7 +79,6 @@ pub enum AppState {
     Normal,
     Popup(Vec<Popup>),
     Help,
-    // AlbumInfo(Album),
 }
 
 #[allow(clippy::large_enum_variant)]
@@ -99,6 +100,7 @@ pub enum Tab {
     Queue,
     Discover,
     Genres,
+    Preferences,
 }
 
 impl fmt::Display for Tab {
@@ -109,17 +111,19 @@ impl fmt::Display for Tab {
             Tab::Queue => write!(f, "Queue"),
             Tab::Discover => write!(f, "Discover"),
             Tab::Genres => write!(f, "Genres"),
+            Tab::Preferences => write!(f, "Preferences"),
         }
     }
 }
 
 impl Tab {
-    pub const VALUES: [Self; 5] = [
+    pub const VALUES: [Self; 6] = [
         Tab::Favorites,
         Tab::Search,
         Tab::Queue,
         Tab::Discover,
         Tab::Genres,
+        Tab::Preferences,
     ];
 }
 
@@ -356,6 +360,10 @@ impl App {
                     self.navigate_to_genres();
                     self.should_draw = true;
                 }
+                KeyCode::Char('6') => {
+                    self.navigate_to_preferences();
+                    self.should_draw = true;
+                }
                 KeyCode::Char(' ') => {
                     self.controls.play_pause();
                     self.should_draw = true;
@@ -542,6 +550,9 @@ impl App {
                             )
                             .await
                     }
+                    Tab::Preferences => {
+                        Ok(self.preferences.handle_events(event, &self.controls).await)
+                    }
                 };
 
                 self.handle_output(key_event.code, screen_output).await;
@@ -572,6 +583,10 @@ impl App {
 
     fn navigate_to_genres(&mut self) {
         self.current_screen = Tab::Genres;
+    }
+
+    fn navigate_to_preferences(&mut self) {
+        self.current_screen = Tab::Preferences;
     }
 
     fn exit(&mut self) {

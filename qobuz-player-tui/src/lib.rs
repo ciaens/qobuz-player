@@ -3,11 +3,15 @@ use std::sync::Arc;
 use app::{App, get_current_state_without_image};
 use favorites::FavoritesState;
 use qobuz_player_controls::{
-    AppResult, ExitSender, PositionReceiver, StatusReceiver, TracklistReceiver, client::Client,
-    controls::Controls, error::Error, notification::NotificationBroadcast,
+    AppResult, ExitSender, PositionReceiver, StatusReceiver, TracklistReceiver,
+    client::Client,
+    controls::Controls,
+    database::{Configuration, Database},
+    notification::NotificationBroadcast,
 };
 use queue::QueueState;
 use ratatui::{prelude::*, widgets::*};
+use tokio::sync::mpsc;
 use ui::center;
 
 mod app;
@@ -16,6 +20,7 @@ mod favorites;
 mod genres;
 mod now_playing;
 mod popup;
+mod preferences;
 mod queue;
 mod search;
 mod sub_tab;
@@ -31,7 +36,10 @@ pub async fn init(
     tracklist_receiver: TracklistReceiver,
     status_receiver: StatusReceiver,
     exit_sender: ExitSender,
+    audio_cache_ttl_sender: mpsc::UnboundedSender<u32>,
+    initial_configuration: Configuration,
     disable_tui_album_cover: bool,
+    database: Arc<Database>,
 ) -> AppResult<()> {
     let mut terminal = ratatui::init();
 
@@ -67,15 +75,20 @@ pub async fn init(
         queue: QueueState::new(queue_tracks),
         discover: discover::DiscoverState::new(&client).await?,
         genres: genres::GenresState::new(&client).await?,
+        preferences: preferences::PreferencesState::new(
+            exit_sender.clone(),
+            audio_cache_ttl_sender,
+            initial_configuration,
+            database,
+        ),
         client,
     };
 
     _ = app.run(&mut terminal).await;
     ratatui::restore();
-    match exit_sender.send(true) {
-        Ok(_) => Ok(()),
-        Err(_) => Err(Error::Notification),
-    }
+    let _ = exit_sender.send(true);
+
+    Ok(())
 }
 
 fn draw_loading_screen<B: Backend>(terminal: &mut Terminal<B>) {

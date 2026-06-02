@@ -122,7 +122,7 @@ fn preferences_page(
         &configuration,
     ));
     page.add(&audio_group(controls, volume_receiver, &configuration));
-    page.add(&logout_group(exit_sender));
+    page.add(&logout_group(exit_sender, database));
 
     page
 }
@@ -316,7 +316,7 @@ fn audio_group(
     group
 }
 
-fn logout_group(exit_sender: ExitSender) -> adw::PreferencesGroup {
+fn logout_group(exit_sender: ExitSender, database: Arc<Database>) -> adw::PreferencesGroup {
     let group = adw::PreferencesGroup::new();
 
     let logout = adw::ButtonRow::new();
@@ -324,7 +324,14 @@ fn logout_group(exit_sender: ExitSender) -> adw::PreferencesGroup {
     logout.add_css_class("destructive-action");
 
     logout.connect_activated(move |_| {
-        exit_sender.send(true).unwrap();
+        let database = database.clone();
+        let exit_sender = exit_sender.clone();
+
+        glib::MainContext::default().spawn_local(async move {
+            if database.set_credentials(None).await.is_ok() {
+                exit_sender.send(true).unwrap();
+            }
+        });
     });
 
     group.add(&logout);

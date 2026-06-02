@@ -1,10 +1,10 @@
 use futures::executor::block_on;
 use qobuz_player_cli::{
     ConnectArgs, SharedArgs, SharedCommands, create_player, default_audio_cache,
-    default_audio_quality, get_client, handle_shared_commands, spawn_clean_up,
+    default_audio_quality, get_client, handle_shared_commands, spawn_clean_up_mut,
 };
 use std::sync::Arc;
-use tokio::sync::broadcast;
+use tokio::sync::{broadcast, mpsc};
 
 use clap::Parser;
 #[cfg(any(windows, target_os = "linux", target_os = "macos"))]
@@ -44,6 +44,7 @@ pub async fn run() -> AppResult<()> {
     let args = Arguments::parse();
     let database = Arc::new(Database::new().await?);
     let headless = false;
+    let configuration = database.get_configuration().await?;
 
     if let Some(command) = args.command {
         handle_shared_commands(command, &database).await?;
@@ -141,6 +142,13 @@ pub async fn run() -> AppResult<()> {
         });
     }
 
+    let (ttl_tx, ttl_rx) = mpsc::unbounded_channel::<u32>();
+    spawn_clean_up_mut(
+        database.clone(),
+        Some(configuration.cache_ttl_hours),
+        ttl_rx,
+    );
+
     tokio::spawn(async move {
         if let Err(e) = qobuz_player_tui::init(
             client,
@@ -150,7 +158,10 @@ pub async fn run() -> AppResult<()> {
             tracklist_receiver,
             status_receiver,
             exit_sender,
+            ttl_tx,
+            configuration,
             args.disable_album_cover,
+            database,
         )
         .await
         {
@@ -158,7 +169,6 @@ pub async fn run() -> AppResult<()> {
         };
     });
 
-    spawn_clean_up(database, args.shared.audio_cache_time_to_live);
     player.player_loop(exit_receiver).await?;
 
     Ok(())

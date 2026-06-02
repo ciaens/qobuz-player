@@ -99,7 +99,7 @@ pub async fn handle_shared_commands(command: SharedCommands, database: &Database
             let (_client, oauth_result) =
                 Client::new_with_oauth_login(AudioQuality::Mp3, false, true).await?;
 
-            database.set_credentials(oauth_result.into()).await?;
+            database.set_credentials(Some(oauth_result.into())).await?;
             println!("Login successful! You can now run qobuz-player.");
             Ok(())
         }
@@ -134,7 +134,7 @@ pub async fn get_client(
                 Client::new_with_oauth_login(max_audio_quality, file_based_streaming, headless)
                     .await?;
 
-            database.set_credentials(oauth_result.into()).await?;
+            database.set_credentials(Some(oauth_result.into())).await?;
 
             client
         }
@@ -165,38 +165,48 @@ pub fn spawn_clean_up(database: Arc<Database>, audio_cache_time_to_live: u32) {
 
 pub fn spawn_clean_up_mut(
     database: Arc<Database>,
-    mut initial_ttl: Option<u32>,
+    initial_ttl: Option<u32>,
     mut ttl_rx: mpsc::UnboundedReceiver<u32>,
 ) {
     tokio::spawn(async move {
+        let mut ttl = initial_ttl.unwrap_or(0);
+        let mut ttl_rx_closed = false;
+
         let mut interval = tokio::time::interval(Duration::from_hours(1));
 
         loop {
             tokio::select! {
-                Some(new_ttl) = ttl_rx.recv() => {
-                    database.set_cache_ttl_hours(new_ttl).await.unwrap();
+                new_ttl = ttl_rx.recv(), if !ttl_rx_closed => {
+                    match new_ttl {
+                        Some(new_ttl) => {
+                            database.set_cache_ttl_hours(new_ttl).await.unwrap();
 
-                    if new_ttl == 0 {
-                        initial_ttl = None;
+                            ttl = new_ttl;
+                        }
 
-                    tracing::info!("Disabled audio cache busting");
+                        None => {
+                            ttl_rx_closed = true;
+                        }
+                    }
+                }
+
+                _ = interval.tick() => {
+                    if ttl == 0 {
                         continue;
                     }
 
-                    initial_ttl = Some(new_ttl);
-                    tracing::info!("Updated audio cache ttl to: {new_ttl} hours");
-                    continue;
-                }
-
-                _ = interval.tick(), if initial_ttl.is_some() => {
-                    let ttl = initial_ttl.unwrap();
-
-                    if let Ok(deleted_paths) = database
+                    match database
                         .clean_up_cache_entries(time::Duration::hours(ttl.into()))
                         .await
                     {
-                        for path in deleted_paths {
-                            let _ = tokio::fs::remove_file(&path).await;
+                        Ok(deleted_paths) => {
+                            for path in deleted_paths {
+                                let _ = tokio::fs::remove_file(&path).await;
+                            }
+                        }
+
+                        Err(err) => {
+                            tracing::error!("Failed to clean up cache entries: {err:?}");
                         }
                     }
                 }
