@@ -15,7 +15,7 @@ use ratatui::{
 };
 
 use crate::{
-    app::{NotificationList, Output},
+    app::{FavoriteAdd, FavoriteRemove, NotificationList, Output},
     ui::{basic_list_table, block, mark_explicit_and_hifi, mark_favorite},
 };
 
@@ -145,7 +145,7 @@ impl QueueState {
                                 "{} added to favorites",
                                 selected.title
                             )));
-                            return Ok(Output::UpdateFavorites);
+                            return Ok(Output::FavoriteAdded(FavoriteAdd::Track(selected.clone())));
                         }
                         Ok(Output::Consumed)
                     }
@@ -161,7 +161,7 @@ impl QueueState {
                                 "{} removed from favorites",
                                 selected.title
                             )));
-                            return Ok(Output::UpdateFavorites);
+                            return Ok(Output::FavoriteRemoved(FavoriteRemove::Track(selected.id)));
                         }
                         Ok(Output::Consumed)
                     }

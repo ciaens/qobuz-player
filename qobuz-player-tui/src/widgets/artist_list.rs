@@ -12,7 +12,7 @@ use ratatui::{
 };
 
 use crate::{
-    app::{FilteredListState, NotificationList, Output},
+    app::{FavoriteAdd, FavoriteRemove, FilteredListState, NotificationList, Output},
     popup::{ArtistPopupState, Popup},
     ui::{basic_list_table, fetch_image, mark_favorite},
 };
@@ -100,9 +100,9 @@ impl ArtistList {
                         "{} added to favorites",
                         selected.name
                     )));
-                    return Ok(Output::UpdateFavorites);
+                    return Ok(Output::FavoriteAdded(FavoriteAdd::Artist(selected.clone())));
                 }
-                Ok(Output::UpdateFavorites)
+                Ok(Output::Consumed)
             }
 
             KeyCode::Char('U') => {
@@ -116,9 +116,9 @@ impl ArtistList {
                         "{} removed from favorites",
                         selected.name
                     )));
-                    return Ok(Output::UpdateFavorites);
+                    return Ok(Output::FavoriteRemoved(FavoriteRemove::Artist(selected.id)));
                 }
-                Ok(Output::UpdateFavorites)
+                Ok(Output::Consumed)
             }
 
             KeyCode::Char('i') => {

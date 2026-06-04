@@ -13,7 +13,7 @@ use ratatui::{
 };
 
 use crate::{
-    app::{FilteredListState, NotificationList, Output},
+    app::{FavoriteAdd, FavoriteRemove, FilteredListState, NotificationList, Output},
     popup::{AlbumPopupState, Popup},
     ui::{
         COLUMN_SPACING, HIGHLIGHT_STYLE, SELECTED_STYLE, fetch_image, format_duration,
@@ -93,7 +93,7 @@ impl AlbumList {
                         "{} added to favorites",
                         selected.title
                     )));
-                    return Ok(Output::UpdateFavorites);
+                    return Ok(Output::FavoriteAdded(FavoriteAdd::Album(selected.clone())));
                 }
 
                 Ok(Output::Consumed)
@@ -110,7 +110,9 @@ impl AlbumList {
                         "{} removed from favorites",
                         selected.title
                     )));
-                    return Ok(Output::UpdateFavorites);
+                    return Ok(Output::FavoriteRemoved(FavoriteRemove::Album(
+                        selected.id.clone(),
+                    )));
                 }
 
                 Ok(Output::Consumed)
