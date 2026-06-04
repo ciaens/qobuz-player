@@ -91,7 +91,9 @@ impl App {
         match self.current_screen {
             Tab::Favorites => self.favorites.render(frame, tab_content_area, favorite_ids),
             Tab::Search => self.search.render(frame, tab_content_area, favorite_ids),
-            Tab::Queue => self.queue.render(frame, tab_content_area),
+            Tab::Queue => self
+                .queue
+                .render(frame, tab_content_area, &favorite_ids.tracks),
             Tab::Discover => self.discover.render(frame, tab_content_area, favorite_ids),
             Tab::Genres => self.genres.render(frame, tab_content_area, favorite_ids),
             Tab::Preferences => self.preferences.render(frame, tab_content_area),

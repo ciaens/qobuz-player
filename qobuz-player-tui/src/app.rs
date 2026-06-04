@@ -541,7 +541,16 @@ impl App {
                             )
                             .await
                     }
-                    Tab::Queue => Ok(self.queue.handle_events(event, &self.controls).await),
+                    Tab::Queue => {
+                        self.queue
+                            .handle_events(
+                                event,
+                                &self.client,
+                                &self.controls,
+                                &mut self.notifications,
+                            )
+                            .await
+                    }
                     Tab::Discover => {
                         self.discover
                             .handle_events(
