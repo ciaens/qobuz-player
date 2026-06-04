@@ -113,7 +113,11 @@ fn draw_loading_screen<B: Backend>(terminal: &mut Terminal<B>) {
 
     terminal
         .draw(|f| {
-            let area = center(f.area(), Constraint::Length(width), Constraint::Length(height));
+            let area = center(
+                f.area(),
+                Constraint::Length(width),
+                Constraint::Length(height),
+            );
             let paragraph = Paragraph::new(ascii_art).alignment(Alignment::Left);
             f.render_widget(paragraph, area);
         })
