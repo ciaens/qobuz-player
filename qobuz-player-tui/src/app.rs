@@ -22,7 +22,7 @@ use qobuz_player_controls::{
 };
 use ratatui::{DefaultTerminal, widgets::*};
 use ratatui_image::protocol::StatefulProtocol;
-use std::{io, sync::Arc, time::Instant};
+use std::{collections::HashSet, io, sync::Arc, time::Instant};
 use tokio::time::{self, Duration};
 
 #[derive(Default)]
@@ -71,6 +71,14 @@ pub struct App {
     pub full_screen: bool,
     pub disable_tui_album_cover: bool,
     pub current_image_url: Option<String>,
+    pub favorite_ids: FavoriteIds,
+}
+
+#[derive(Default)]
+pub struct FavoriteIds {
+    pub tracks: HashSet<u32>,
+    pub albums: HashSet<String>,
+    pub artists: HashSet<u32>,
 }
 
 #[derive(Default)]
@@ -278,11 +286,15 @@ impl App {
         Ok(())
     }
 
-    async fn update_favorites(&mut self) {
+    pub(crate) async fn update_favorites(&mut self) {
         let favorites = self.client.favorites().await;
         let Ok(favorites) = favorites else {
             return;
         };
+
+        self.favorite_ids.tracks = favorites.tracks.iter().map(|t| t.id).collect();
+        self.favorite_ids.albums = favorites.albums.iter().map(|a| a.id.clone()).collect();
+        self.favorite_ids.artists = favorites.artists.iter().map(|a| a.id).collect();
 
         self.favorites.albums.set_all_items(favorites.albums);
         self.favorites.artists.set_all_items(favorites.artists);

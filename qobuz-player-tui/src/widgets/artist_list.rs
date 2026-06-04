@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use qobuz_player_controls::{
     AppResult, client::Client, models::Artist, notification::Notification,
 };
@@ -12,7 +14,7 @@ use ratatui::{
 use crate::{
     app::{FilteredListState, NotificationList, Output},
     popup::{ArtistPopupState, Popup},
-    ui::{basic_list_table, fetch_image},
+    ui::{basic_list_table, fetch_image, mark_favorite},
 };
 
 #[derive(Default)]
@@ -33,12 +35,21 @@ impl ArtistList {
         Self { items: artists }
     }
 
-    pub fn render(&mut self, area: Rect, buf: &mut Buffer, focus: bool) {
+    pub fn render(
+        &mut self,
+        area: Rect,
+        buf: &mut Buffer,
+        focus: bool,
+        favorite_artists: &HashSet<u32>,
+    ) {
         let table = basic_list_table(
             self.items
                 .filter()
                 .iter()
-                .map(|artist| Row::new(Line::from(artist.name.clone())))
+                .map(|artist| {
+                    let name = Line::from(artist.name.clone());
+                    Row::new(mark_favorite(name, favorite_artists.contains(&artist.id)))
+                })
                 .collect::<Vec<_>>(),
             focus,
         );
