@@ -48,7 +48,10 @@ impl ArtistList {
                 .iter()
                 .map(|artist| {
                     let name = Line::from(artist.name.clone());
-                    Row::new(mark_favorite(name, favorite_artists.contains(&artist.id)))
+                    Row::new(vec![mark_favorite(
+                        name,
+                        favorite_artists.contains(&artist.id),
+                    )])
                 })
                 .collect::<Vec<_>>(),
             focus,
