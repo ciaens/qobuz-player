@@ -14,12 +14,11 @@ qobuz-player-disconnect-server = { version = "*", path = "../qobuz-player-discon
 tokio.workspace = true
 tracing.workspace = true
 reqwest.workspace = true
-serde.workspace = true
 serde_json.workspace = true
 futures.workspace = true
 md5.workspace = true
 
-# TODO fix
+# TODO add to workspace
 eventsource-stream = "0.2"
 
 # binary dependencies
