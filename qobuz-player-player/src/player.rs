@@ -1,5 +1,6 @@
 use qobuz_player_controls::{
-    ExitReceiver, PositionReceiver, Status, StatusReceiver, TracklistReceiver, VolumeReceiver,
+    AutoPlayReceiver, ExitReceiver, PositionReceiver, Status, StatusReceiver, TracklistReceiver,
+    VolumeReceiver,
     controls::{ControlCommand, Controls, NewQueueItem, StreamingConfiguration},
     models::{Album, Track, TrackStatus},
     tracklist::{
@@ -49,6 +50,8 @@ pub struct Player {
     sample_rate_change_delay: Option<Duration>,
     active: Sender<bool>,
     active_rx: Receiver<bool>,
+    auto_play: Sender<bool>,
+    auto_play_rx: Receiver<bool>,
 }
 
 impl Player {
@@ -57,6 +60,7 @@ impl Player {
         tracklist: Tracklist,
         client: Arc<Client>,
         volume: f32,
+        enable_auto_play: bool,
         broadcast: Arc<NotificationBroadcast>,
         audio_cache_directory: std::path::PathBuf,
         database: Arc<Database>,
@@ -65,6 +69,8 @@ impl Player {
         preferred_device_id: Option<String>,
     ) -> AppResult<Self> {
         let (volume, volume_receiver) = watch::channel(volume);
+        let (auto_play, auto_play_rx) = watch::channel(enable_auto_play);
+
         let sink = Sink::new(volume_receiver, preferred_device_id)?;
 
         let downloader = Downloader::new(audio_cache_directory, database.clone(), client.clone());
@@ -100,6 +106,8 @@ impl Player {
             sample_rate_change_delay,
             active,
             active_rx,
+            auto_play,
+            auto_play_rx,
         })
     }
 
@@ -113,6 +121,10 @@ impl Player {
 
     pub fn volume(&self) -> VolumeReceiver {
         self.volume.subscribe()
+    }
+
+    pub fn auto_play(&self) -> AutoPlayReceiver {
+        self.auto_play_rx.clone()
     }
 
     pub fn position(&self) -> PositionReceiver {
@@ -129,6 +141,10 @@ impl Player {
 
     pub fn volume_sender(&self) -> watch::Sender<f32> {
         self.volume.clone()
+    }
+
+    pub fn auto_play_sender(&self) -> watch::Sender<bool> {
+        self.auto_play.clone()
     }
 
     pub fn position_sender(&self) -> watch::Sender<Duration> {
@@ -240,7 +256,28 @@ impl Player {
         Ok(())
     }
 
-    async fn broadcast_tracklist(&self, tracklist: Tracklist) -> AppResult<()> {
+    async fn set_auto_play(&self, enable: bool) -> AppResult<()> {
+        self.auto_play.send(enable)?;
+        self.database.set_auto_play(enable).await?;
+        Ok(())
+    }
+
+    async fn broadcast_tracklist(&self, mut tracklist: Tracklist) -> AppResult<()> {
+        if *self.auto_play.borrow() && *self.active.borrow() {
+            let queue = tracklist.queue();
+            let tracks_remaining = queue.len() - tracklist.current_position();
+
+            if tracks_remaining == 1 {
+                let suggestion = self
+                    .client
+                    .suggest_track(queue.iter().map(|x| x.track.id).collect())
+                    .await?;
+
+                tracklist.set_list_type(TracklistType::Tracks);
+                tracklist.push_track(suggestion);
+            }
+        }
+
         self.database.set_tracklist(&tracklist).await?;
         self.tracklist_tx.send(tracklist)?;
         Ok(())
@@ -669,6 +706,9 @@ impl Player {
             }
             ControlCommand::SetVolume { volume } => {
                 self.set_volume(volume).await?;
+            }
+            ControlCommand::SetAutoPlay { enable } => {
+                self.set_auto_play(enable).await?;
             }
             ControlCommand::AddTracksToQueue { ids } => self.add_tracks_to_queue(ids).await?,
             ControlCommand::RemoveIndexFromQueue { index } => {
