@@ -18,9 +18,7 @@ reqwest.workspace = true
 serde_json.workspace = true
 futures.workspace = true
 md5.workspace = true
-
-# TODO add to workspace
-eventsource-stream = "0.2"
+eventsource-stream.workspace = true
 
 # binary dependencies
 clap.workspace = true
