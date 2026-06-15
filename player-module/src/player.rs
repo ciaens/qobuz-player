@@ -500,22 +500,25 @@ impl Player {
         self.new_queue(tracklist, true).await
     }
 
-    async fn play_tracks(&mut self, ids: Vec<u32>, shuffle: bool) -> AppResult<()> {
-        let mut tracks: Vec<_> = self
-            .client
-            .tracks(ids)
-            .await?
-            .into_iter()
-            .filter(|t| t.available)
-            .collect();
+    async fn play_tracks(
+        &mut self,
+        tracks: Vec<Track>,
+        shuffle: bool,
+        index: usize,
+    ) -> AppResult<()> {
+        let unstreamable_tracks_to_index = match shuffle {
+            true => 0,
+            false => tracks.iter().take(index).filter(|t| !t.available).count(),
+        };
+
+        let mut tracks: Vec<_> = tracks.into_iter().filter(|t| t.available).collect();
 
         if shuffle {
             tracks.shuffle(&mut rand::rng());
         }
 
         let mut tracklist = Tracklist::new(TracklistType::Tracks, tracks_to_queue_items(tracks));
-
-        tracklist.skip_to_track(0);
+        tracklist.skip_to_track(index - unstreamable_tracks_to_index);
         self.new_queue(tracklist, true).await
     }
 
@@ -571,11 +574,10 @@ impl Player {
         Ok(())
     }
 
-    async fn add_tracks_to_queue(&mut self, ids: Vec<u32>) -> AppResult<()> {
+    async fn add_tracks_to_queue(&mut self, tracks: Vec<Track>) -> AppResult<()> {
         let mut tracklist = self.tracklist_rx.borrow().clone();
         tracklist.set_list_type(TracklistType::Tracks);
 
-        let tracks = self.client.tracks(ids).await?;
         let track_titles: Vec<_> = tracks.iter().map(|x| x.title.clone()).collect();
         let track_titles = track_titles.join(", ");
 
@@ -590,11 +592,10 @@ impl Player {
         Ok(())
     }
 
-    async fn play_tracks_next(&mut self, ids: Vec<u32>) -> AppResult<()> {
+    async fn play_tracks_next(&mut self, mut tracks: Vec<Track>) -> AppResult<()> {
         let mut tracklist = self.tracklist_rx.borrow().clone();
         tracklist.set_list_type(TracklistType::Tracks);
 
-        let mut tracks = self.client.tracks(ids).await?;
         let track_titles: Vec<_> = tracks.iter().map(|x| x.title.clone()).collect();
         let track_titles = track_titles.join(", ");
 
@@ -678,8 +679,12 @@ impl Player {
             ControlCommand::Track { id } => {
                 self.play_track(id).await?;
             }
-            ControlCommand::Tracks { ids, shuffle } => {
-                self.play_tracks(ids, shuffle).await?;
+            ControlCommand::Tracks {
+                tracks,
+                shuffle,
+                index,
+            } => {
+                self.play_tracks(tracks, shuffle, index).await?;
             }
             ControlCommand::Next => {
                 self.next().await?;
@@ -717,11 +722,11 @@ impl Player {
             ControlCommand::SetAutoPlay { enable } => {
                 self.set_auto_play(enable).await?;
             }
-            ControlCommand::AddTracksToQueue { ids } => self.add_tracks_to_queue(ids).await?,
             ControlCommand::RemoveIndexFromQueue { index } => {
                 self.remove_index_from_queue(index).await?
             }
-            ControlCommand::PlayTracksNext { ids } => self.play_tracks_next(ids).await?,
+            ControlCommand::AddTracksToQueue { tracks } => self.add_tracks_to_queue(tracks).await?,
+            ControlCommand::PlayTracksNext { tracks } => self.play_tracks_next(tracks).await?,
             ControlCommand::ReorderQueue { new_order } => self.reorder_queue(new_order).await?,
             ControlCommand::NewQueue {
                 items,

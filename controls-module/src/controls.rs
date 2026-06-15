@@ -3,6 +3,8 @@ use std::{path::PathBuf, time::Duration};
 use qobuz_client::client::AudioQuality;
 use tokio::sync::broadcast;
 
+use crate::models::Track;
+
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
 pub enum ControlCommand {
     Album {
@@ -19,8 +21,9 @@ pub enum ControlCommand {
         index: usize,
     },
     Tracks {
-        ids: Vec<u32>,
+        tracks: Vec<Track>,
         shuffle: bool,
+        index: usize,
     },
     Track {
         id: u32,
@@ -46,13 +49,13 @@ pub enum ControlCommand {
         enable: bool,
     },
     AddTracksToQueue {
-        ids: Vec<u32>,
+        tracks: Vec<Track>,
     },
     RemoveIndexFromQueue {
         index: usize,
     },
     PlayTracksNext {
-        ids: Vec<u32>,
+        tracks: Vec<Track>,
     },
     ReorderQueue {
         new_order: Vec<usize>,
@@ -135,20 +138,24 @@ impl Controls {
         self.send(ControlCommand::Track { id });
     }
 
-    pub fn play_tracks(&self, ids: Vec<u32>, shuffle: bool) {
-        self.send(ControlCommand::Tracks { ids, shuffle });
+    pub fn play_tracks(&self, tracks: Vec<Track>, shuffle: bool, index: usize) {
+        self.send(ControlCommand::Tracks {
+            tracks,
+            shuffle,
+            index,
+        });
     }
 
-    pub fn add_tracks_to_queue(&self, ids: Vec<u32>) {
-        self.send(ControlCommand::AddTracksToQueue { ids });
+    pub fn add_tracks_to_queue(&self, tracks: Vec<Track>) {
+        self.send(ControlCommand::AddTracksToQueue { tracks });
+    }
+
+    pub fn play_tracks_next(&self, tracks: Vec<Track>) {
+        self.send(ControlCommand::PlayTracksNext { tracks });
     }
 
     pub fn remove_index_from_queue(&self, index: usize) {
         self.send(ControlCommand::RemoveIndexFromQueue { index });
-    }
-
-    pub fn play_tracks_next(&self, ids: Vec<u32>) {
-        self.send(ControlCommand::PlayTracksNext { ids });
     }
 
     pub fn play_top_tracks(&self, artist_id: u32, index: usize) {
