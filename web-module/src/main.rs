@@ -2,18 +2,16 @@
 use cli_module::GpioArgs;
 use cli_module::{
     ConnectArgs, DelayArgs, DisconnectArgs, RfidArgs, SharedArgs, SharedCommands, create_player,
-    default_audio_cache, default_audio_quality, get_client, handle_shared_commands,
+    default_audio_cache, default_audio_quality, error_exit, get_client, handle_shared_commands,
     parse_disconnect_args, spawn_clean_up,
 };
-use disconnect_module::DisconnectClientConfig;
-use rfid_module::RfidState;
+use disconnect_module::{DisconnectClientConfig, spawn_disconnect};
+use rfid_module::{RfidState, spawn_rfid};
 use std::sync::Arc;
 use tokio::sync::{broadcast, mpsc, watch};
 
 use clap::Parser;
-use player_module::{
-    AppResult, database::Database, error::Error, notification::NotificationBroadcast,
-};
+use player_module::{AppResult, database::Database, notification::NotificationBroadcast};
 
 #[derive(Parser)]
 #[clap(author, version, about, long_about = None)]
@@ -29,6 +27,11 @@ struct Arguments {
     #[clap(long, default_value_t = false)]
     /// Enable rfid interface
     rfid: bool,
+
+    #[cfg(target_os = "linux")]
+    #[clap(long, default_value_t = false)]
+    /// Enable mpris interface
+    mpris: bool,
 
     #[clap(flatten)]
     rfid_config: RfidArgs,
@@ -75,7 +78,7 @@ pub async fn run() -> AppResult<()> {
         return Ok(());
     }
 
-    let (_, exit_receiver) = broadcast::channel(5);
+    let (exit_sender, exit_receiver) = broadcast::channel(5);
 
     let max_audio_quality = default_audio_quality(&database, args.shared.max_audio_quality).await?;
     let client = get_client(
@@ -189,28 +192,16 @@ pub async fn run() -> AppResult<()> {
     }
 
     if let Some(rfid_state) = rfid_state {
-        let controls = player.controls();
-        let database = database.clone();
-        let tracklist_receiver = player.tracklist();
-        let connect_device_name = disconnect_args.as_ref().map(|x| x.device_name.clone());
-
-        tokio::spawn(async move {
-            if let Err(e) = rfid_module::init(
-                rfid_state,
-                tracklist_receiver,
-                controls,
-                database,
-                broadcast,
-                args.rfid_config.rfid_server_base_address,
-                args.rfid_config.rfid_server_secret,
-                connect_device_name,
-                set_active_device_tx,
-            )
-            .await
-            {
-                error_exit(e);
-            }
-        });
+        spawn_rfid(
+            &player,
+            database.clone(),
+            broadcast,
+            disconnect_args.as_ref().map(|x| x.device_name.clone()),
+            args.rfid_config.rfid_server_base_address,
+            args.rfid_config.rfid_server_secret,
+            rfid_state,
+            set_active_device_tx,
+        );
     }
 
     if let (
@@ -224,44 +215,13 @@ pub async fn run() -> AppResult<()> {
         active_device_tx,
         set_active_device_rx,
     ) {
-        let position_receiver = player.position();
-        let tracklist_receiver = player.tracklist();
-        let volume_receiver = player.volume();
-        let status_receiver = player.status();
-        let auto_play_receiver = player.auto_play();
-        let controls = player.controls();
-        let active_sender = player.active_sender();
-
-        let tracklist_sender = player.tracklist_sender();
-        let position_sender = player.position_sender();
-        let status_sender = player.status_sender();
-        let volume_sender = player.volume_sender();
-        let auto_play_sender = player.auto_play_sender();
-
-        tokio::spawn(async move {
-            if let Err(e) = disconnect_module::init(
-                config_rx,
-                controls,
-                tracklist_sender,
-                position_sender,
-                volume_sender,
-                auto_play_sender,
-                status_sender,
-                active_sender,
-                available_devices_tx,
-                active_device_tx,
-                position_receiver,
-                tracklist_receiver,
-                status_receiver,
-                volume_receiver,
-                auto_play_receiver,
-                set_active_device_rx,
-            )
-            .await
-            {
-                error_exit(e);
-            }
-        });
+        spawn_disconnect(
+            &player,
+            config_rx,
+            available_devices_tx,
+            active_device_tx,
+            set_active_device_rx,
+        );
     }
 
     if args.connect.connect {
@@ -291,13 +251,15 @@ pub async fn run() -> AppResult<()> {
         });
     }
 
+    #[cfg(target_os = "linux")]
+    if args.mpris {
+        use mpris_module::spawn_mpris;
+
+        spawn_mpris(&player, &exit_sender, "qobuz-player".to_string());
+    }
+
     spawn_clean_up(database, args.shared.audio_cache_time_to_live);
     player.player_loop(exit_receiver).await?;
 
     Ok(())
-}
-
-fn error_exit(error: Error) {
-    eprintln!("{error}");
-    std::process::exit(1);
 }
