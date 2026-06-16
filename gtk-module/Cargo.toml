@@ -25,6 +25,7 @@ url = "2.5"
 
 tokio.workspace = true
 futures.workspace = true
+futures-util = "0.3"
 
 # binary dependencies
 tracing.workspace = true

@@ -1,5 +1,9 @@
-use std::{cell::RefCell, rc::Rc, sync::Arc};
+use std::{cell::RefCell, fmt, future::Future, rc::Rc, sync::Arc};
 
+use futures_util::{
+    future::{Either, select},
+    pin_mut,
+};
 use gtk::{gio, glib, prelude::*};
 use gtk4 as gtk;
 
@@ -10,6 +14,39 @@ use crate::ui::{
     album_detail_page::AlbumHeaderInfo, album_scroller, playlist_detail_page::PlaylistHeaderInfo,
     playlist_scroller,
 };
+
+const LOAD_TIMEOUT_SECONDS: u32 = 10;
+
+#[derive(Debug)]
+enum LoadError {
+    Timeout,
+    Request(String),
+}
+
+impl fmt::Display for LoadError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            LoadError::Timeout => write!(f, "Request timed out"),
+            LoadError::Request(err) => write!(f, "{err}"),
+        }
+    }
+}
+
+async fn with_timeout<T, E, F>(future: F) -> Result<T, LoadError>
+where
+    F: Future<Output = Result<T, E>>,
+    E: fmt::Display,
+{
+    let timeout = glib::timeout_future_seconds(LOAD_TIMEOUT_SECONDS);
+
+    pin_mut!(future);
+    pin_mut!(timeout);
+
+    match select(future, timeout).await {
+        Either::Left((result, _)) => result.map_err(|err| LoadError::Request(err.to_string())),
+        Either::Right((_, _)) => Err(LoadError::Timeout),
+    }
+}
 
 #[derive(Clone)]
 pub struct DiscoverPage {
@@ -75,32 +112,35 @@ impl DiscoverPage {
         let selected = self.selected.borrow().clone();
 
         glib::MainContext::default().spawn_local(async move {
-            let discover_data = match client.discover_page(selected.clone().genre_id).await {
-                Ok(data) => data,
-                Err(err) => {
-                    tracing::error!("{err}");
-                    return;
-                }
-            };
+            let discover_data =
+                match with_timeout(client.discover_page(selected.clone().genre_id)).await {
+                    Ok(data) => data,
+                    Err(err) => {
+                        tracing::error!("{err}");
+                        page.render_error("Failed to load Discover");
+                        return;
+                    }
+                };
 
-            let genres = match client.genres().await {
+            let genres = match with_timeout(client.genres()).await {
                 Ok(genres) => genres,
                 Err(err) => {
                     tracing::error!("{err}");
+                    page.render_error("Failed to load genres");
                     return;
                 }
             };
 
-            let playlists = match client
-                .genre_playlists(GenrePlaylistSlug {
-                    genre_id: selected.genre_id,
-                    playlist_slug: selected.playlist_tag.map(|x| x.slug),
-                })
-                .await
+            let playlists = match with_timeout(client.genre_playlists(GenrePlaylistSlug {
+                genre_id: selected.genre_id,
+                playlist_slug: selected.playlist_tag.map(|x| x.slug),
+            }))
+            .await
             {
                 Ok(playlists) => playlists,
                 Err(err) => {
                     tracing::error!("{err}");
+                    page.render_error("Failed to load playlists");
                     return;
                 }
             };
@@ -190,6 +230,36 @@ impl DiscoverPage {
             .build();
 
         self.root.append(&spinner);
+    }
+
+    fn render_error(&self, message: &str) {
+        self.clear();
+
+        let box_ = gtk::Box::builder()
+            .orientation(gtk::Orientation::Vertical)
+            .spacing(12)
+            .halign(gtk::Align::Center)
+            .valign(gtk::Align::Center)
+            .margin_top(48)
+            .margin_bottom(48)
+            .build();
+
+        let label = gtk::Label::builder()
+            .label(message)
+            .css_classes(["title-3"])
+            .build();
+
+        let retry = gtk::Button::builder().label("Retry").build();
+
+        let page = self.clone();
+        retry.connect_clicked(move |_| {
+            page.load();
+        });
+
+        box_.append(&label);
+        box_.append(&retry);
+
+        self.root.append(&box_);
     }
 
     fn genre_selector_button(&self, genres: &[Genre]) -> gtk::MenuButton {
@@ -424,22 +494,17 @@ impl DiscoverPage {
         let selected = self.selected.borrow().clone();
 
         glib::MainContext::default().spawn_local(async move {
-            let playlists = match client
-                .genre_playlists(GenrePlaylistSlug {
-                    genre_id: selected.genre_id,
-                    playlist_slug: selected.playlist_tag.map(|x| x.slug),
-                })
-                .await
+            let playlists = match with_timeout(client.genre_playlists(GenrePlaylistSlug {
+                genre_id: selected.genre_id,
+                playlist_slug: selected.playlist_tag.map(|x| x.slug),
+            }))
+            .await
             {
                 Ok(playlists) => playlists,
                 Err(err) => {
                     tracing::error!("{err}");
                     return;
                 }
-            };
-
-            let Some(section) = page.playlist_section.borrow().clone() else {
-                return;
             };
 
             page.render_playlist_section_content(&section, &playlist_tags, &playlists);
