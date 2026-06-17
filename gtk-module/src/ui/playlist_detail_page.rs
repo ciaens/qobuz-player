@@ -572,7 +572,6 @@ fn add_owned_playlist_track_controls(
             let stored_tracks = stored_tracks.clone();
 
             glib::MainContext::default().spawn_local(async move {
-                println!("{to_index}");
                 if let Err(error) = client
                     .update_playlist_track_position(to_index, playlist_id, track_playlist_id)
                     .await

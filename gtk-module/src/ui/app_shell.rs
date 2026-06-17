@@ -7,10 +7,10 @@ use libadwaita as adw;
 
 use adw::prelude::*;
 
+use controls_module::ExitSender;
 use controls_module::controls::Controls;
 use controls_module::models::PlaylistSimple;
 use controls_module::tracklist::Tracklist;
-use controls_module::{ExitSender, VolumeReceiver};
 use player_module::client::Client;
 use player_module::database::Database;
 use tokio::sync::mpsc;
@@ -56,7 +56,6 @@ impl AppShell {
         client: Arc<Client>,
         controls: Controls,
         database: Arc<Database>,
-        volume_receiver: VolumeReceiver,
         exit_sender: ExitSender,
         audio_cache_ttl_sender: mpsc::UnboundedSender<u32>,
         on_open_album: Rc<dyn Fn(AlbumHeaderInfo)>,
@@ -268,7 +267,6 @@ impl AppShell {
             app,
             controls,
             database,
-            volume_receiver,
             exit_sender,
             audio_cache_ttl_sender,
             ui_event_sender,

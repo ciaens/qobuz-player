@@ -214,7 +214,6 @@ fn build_ui(
         client.clone(),
         controls.clone(),
         database,
-        volume_receiver,
         exit_sender.clone(),
         audio_cache_ttl_sender,
         on_open_album.clone(),
@@ -235,6 +234,7 @@ fn build_ui(
         on_open_album,
         on_open_artist,
         on_open_playlist,
+        *volume_receiver.borrow(),
     );
 
     let toast_overlay = adw::ToastOverlay::new();
@@ -261,6 +261,7 @@ fn build_ui(
         tracklist_receiver,
         status_receiver,
         position_receiver,
+        volume_receiver,
         disconnect_config_sender,
         connect_available_devices,
         connect_active_device,
@@ -282,6 +283,7 @@ fn setup_listener(
     mut tracklist_receiver: TracklistReceiver,
     mut status_receiver: StatusReceiver,
     mut position_receiver: PositionReceiver,
+    mut volume_receiver: VolumeReceiver,
     disconnect_client_config_sender: watch::Sender<Option<DisconnectClientConfig>>,
     mut connect_available_devices: watch::Receiver<Vec<String>>,
     mut connect_active_device: watch::Receiver<String>,
@@ -313,6 +315,11 @@ fn setup_listener(
                 Ok(_) = position_receiver.changed() => {
                     let position = *position_receiver.borrow_and_update();
                     sender.send(UiEvent::Position(position)).unwrap();
+                }
+
+                Ok(_) = volume_receiver.changed() => {
+                    let volume = *volume_receiver.borrow_and_update();
+                    sender.send(UiEvent::Volume(volume)).unwrap();
                 }
 
                 Ok(_) = connect_available_devices.changed() => {
@@ -370,6 +377,9 @@ fn setup_listener(
                 UiEvent::Position(duration) => {
                     update_progress(&now_playing_bar, &duration);
                 }
+                UiEvent::Volume(volume) => {
+                    now_playing_bar.set_volume(volume);
+                }
                 UiEvent::FavoritesChanged => {
                     shell.reload();
                 }
@@ -401,6 +411,7 @@ enum UiEvent {
     Tracklist(Tracklist),
     Status(Status),
     Position(Duration),
+    Volume(f32),
     FavoritesChanged,
     Exit,
     Toast(String),

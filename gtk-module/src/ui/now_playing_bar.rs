@@ -23,6 +23,7 @@ pub struct NowPlayingBar {
     subtitle_box: gtk::Box,
     cover: gtk::Picture,
     pub play_button: gtk::Button,
+    volume_scale: gtk::Scale,
 
     progress_scale: gtk::Scale,
     progress_current_label: gtk::Label,
@@ -44,6 +45,7 @@ impl NowPlayingBar {
         on_open_album: Rc<dyn Fn(AlbumHeaderInfo)>,
         on_open_artist: Rc<dyn Fn(ArtistHeaderInfo)>,
         on_open_playlist: Rc<dyn Fn(PlaylistHeaderInfo)>,
+        volume: f32,
     ) -> Self {
         let available_devices = Rc::new(RefCell::new(Vec::<String>::new()));
         let active_device = Rc::new(RefCell::new(String::new()));
@@ -153,6 +155,63 @@ impl NowPlayingBar {
             dialog.present(Some(button));
         });
 
+        let volume_button = gtk::MenuButton::builder()
+            .icon_name("audio-volume-high-symbolic")
+            .tooltip_text("Volume")
+            .css_classes(vec!["flat"])
+            .valign(gtk::Align::Center)
+            .build();
+
+        let volume_scale = gtk::Scale::builder()
+            .orientation(gtk::Orientation::Vertical)
+            .draw_value(false)
+            .inverted(true)
+            .height_request(120)
+            .vexpand(true)
+            .build();
+
+        volume_scale.set_range(0.0, 1.0);
+        volume_scale.set_value(volume as f64);
+
+        volume_scale.connect_value_changed({
+            let volume_button = volume_button.clone();
+            let controls = controls.clone();
+
+            move |scale| {
+                let value = scale.value();
+                controls.set_volume(value as f32);
+
+                let icon = if value <= 0.0 {
+                    "audio-volume-muted-symbolic"
+                } else if value < 33.0 {
+                    "audio-volume-low-symbolic"
+                } else if value < 66.0 {
+                    "audio-volume-medium-symbolic"
+                } else {
+                    "audio-volume-high-symbolic"
+                };
+
+                volume_button.set_icon_name(icon);
+            }
+        });
+
+        let volume_box = gtk::Box::builder()
+            .orientation(gtk::Orientation::Vertical)
+            .margin_top(12)
+            .margin_bottom(12)
+            .margin_start(12)
+            .margin_end(12)
+            .build();
+
+        volume_box.append(&volume_scale);
+
+        let volume_popover = gtk::Popover::builder()
+            .child(&volume_box)
+            .has_arrow(true)
+            .build();
+
+        volume_button.set_popover(Some(&volume_popover));
+
         let controls_box = gtk::Box::builder()
             .orientation(gtk::Orientation::Horizontal)
             .spacing(12)
@@ -181,6 +240,7 @@ impl NowPlayingBar {
             .build();
         next_button.connect_clicked(move |_| controls_next.next());
 
+        controls_box.append(&volume_button);
         controls_box.append(&prev_button);
         controls_box.append(&play_button);
         controls_box.append(&next_button);
@@ -343,7 +403,12 @@ impl NowPlayingBar {
             on_open_album,
             on_open_artist,
             on_open_playlist,
+            volume_scale,
         }
+    }
+
+    pub fn set_volume(&self, volume: f32) {
+        self.volume_scale.set_value(volume.into());
     }
 
     pub fn set_output_devices(&self, available_devices: Vec<String>, active_device: String) {

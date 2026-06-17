@@ -8,7 +8,6 @@ use gtk4 as gtk;
 
 use adw::prelude::*;
 use controls_module::ExitSender;
-use controls_module::VolumeReceiver;
 use controls_module::controls::Controls;
 use disconnect_module::DisconnectClientConfig;
 use libadwaita as adw;
@@ -23,7 +22,6 @@ pub fn build_preferences_menu(
     app: &adw::Application,
     controls: Controls,
     database: Arc<Database>,
-    volume_receiver: VolumeReceiver,
     exit_sender: ExitSender,
     audio_cache_ttl_sender: mpsc::UnboundedSender<u32>,
     ui_event_sender: UiEventSender,
@@ -61,8 +59,6 @@ pub fn build_preferences_menu(
             #[weak]
             database,
             #[strong]
-            volume_receiver,
-            #[strong]
             exit_sender,
             #[strong]
             audio_cache_ttl_sender,
@@ -73,7 +69,6 @@ pub fn build_preferences_menu(
                     &app,
                     controls.clone(),
                     database,
-                    volume_receiver.clone(),
                     exit_sender.clone(),
                     audio_cache_ttl_sender.clone(),
                     ui_event_sender.clone(),
@@ -91,7 +86,6 @@ fn show_preferences_dialog(
     app: &adw::Application,
     controls: Controls,
     database: Arc<Database>,
-    volume_receiver: VolumeReceiver,
     exit_sender: ExitSender,
     audio_cache_ttl_sender: mpsc::UnboundedSender<u32>,
     ui_event_sender: UiEventSender,
@@ -102,7 +96,6 @@ fn show_preferences_dialog(
         app,
         controls,
         database,
-        volume_receiver,
         exit_sender,
         audio_cache_ttl_sender,
         ui_event_sender,
@@ -114,7 +107,6 @@ fn preferences_page(
     app: &adw::Application,
     controls: Controls,
     database: Arc<Database>,
-    volume_receiver: VolumeReceiver,
     exit_sender: ExitSender,
     audio_cache_ttl_sender: mpsc::UnboundedSender<u32>,
     ui_event_sender: UiEventSender,
@@ -131,11 +123,7 @@ fn preferences_page(
         &configuration,
     ));
 
-    page.add(&audio_group(
-        controls.clone(),
-        volume_receiver,
-        &configuration,
-    ));
+    page.add(&audio_group(controls.clone(), &configuration));
 
     page.add(&queue_group(controls, &configuration));
 
@@ -261,11 +249,7 @@ fn cache_ttl_row(
     row
 }
 
-fn audio_group(
-    controls: Controls,
-    volume_receiver: VolumeReceiver,
-    configuration: &Configuration,
-) -> adw::PreferencesGroup {
+fn audio_group(controls: Controls, configuration: &Configuration) -> adw::PreferencesGroup {
     let group = adw::PreferencesGroup::new();
     group.set_title("Audio");
 
@@ -317,23 +301,6 @@ fn audio_group(
     });
 
     group.add(&file_based_streaming);
-
-    let volume = adw::ActionRow::new();
-    volume.set_title("Volume");
-
-    let initial_value = volume_receiver.borrow();
-    let scale = gtk::Scale::with_range(gtk::Orientation::Horizontal, 0.0, 1.0, 0.1);
-    scale.set_value(*initial_value as f64);
-    scale.set_hexpand(true);
-
-    scale.connect_value_changed(clone!(move |s| {
-        controls.set_volume(s.value() as f32);
-    }));
-
-    volume.add_suffix(&scale);
-    volume.set_activatable_widget(Some(&scale));
-
-    group.add(&volume);
     group
 }
 
