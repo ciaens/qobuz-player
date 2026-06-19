@@ -36,6 +36,7 @@ pub struct ArtistPopupState {
     image_url: Option<String>,
     image: Option<(StatefulProtocol, f32)>,
     selected_sub_tab: usize,
+    about_scroll: ScrollbarState,
     top_tracks: TrackList,
     id: u32,
 }
@@ -78,6 +79,7 @@ impl ArtistPopupState {
             image_url: artist_page.image,
             image: None,
             selected_sub_tab: 0,
+            about_scroll: ScrollbarState::default(),
             top_tracks: TrackList::new(artist_page.top_tracks),
             id: artist.id,
         };
@@ -110,11 +112,21 @@ impl ArtistPopupState {
     fn cycle_subtab_backwards(&mut self) {
         let count = self.tabs().len();
         self.selected_sub_tab = (self.selected_sub_tab + count - 1) % count;
+        self.about_scroll = ScrollbarState::default();
     }
 
     fn cycle_subtab(&mut self) {
         let count = self.tabs().len();
         self.selected_sub_tab = (self.selected_sub_tab + count + 1) % count;
+        self.about_scroll = ScrollbarState::default();
+    }
+
+    fn scroll_about(&mut self, delta: i16) {
+        let position = self
+            .about_scroll
+            .get_position()
+            .saturating_add_signed(delta as isize);
+        self.about_scroll = self.about_scroll.position(position);
     }
 
     fn visible_tab_kinds(&self) -> Vec<TabKind> {
@@ -228,6 +240,7 @@ pub struct AlbumPopupState {
     bit_depth: Option<u32>,
     sampling_rate: Option<f32>,
     selected_sub_tab: usize,
+    about_scroll: ScrollbarState,
     id: String,
 }
 
@@ -264,6 +277,7 @@ impl AlbumPopupState {
             bit_depth: album.bit_depth,
             sampling_rate: album.sampling_rate,
             selected_sub_tab: 0,
+            about_scroll: ScrollbarState::default(),
             id: album.id,
         }
     }
@@ -316,11 +330,21 @@ impl AlbumPopupState {
     fn cycle_subtab_backwards(&mut self) {
         let count = self.tabs().len();
         self.selected_sub_tab = (self.selected_sub_tab + count - 1) % count;
+        self.about_scroll = ScrollbarState::default();
     }
 
     fn cycle_subtab(&mut self) {
         let count = self.tabs().len();
         self.selected_sub_tab = (self.selected_sub_tab + count + 1) % count;
+        self.about_scroll = ScrollbarState::default();
+    }
+
+    fn scroll_about(&mut self, delta: i16) {
+        let position = self
+            .about_scroll
+            .get_position()
+            .saturating_add_signed(delta as isize);
+        self.about_scroll = self.about_scroll.position(position);
     }
 
     fn visible_tab_kinds(&self) -> Vec<AlbumTabKind> {
@@ -599,8 +623,7 @@ impl Popup {
                     frame.render_widget(Paragraph::new(hint).style(Style::new().dim()), content);
                 } else if album.selected_tab_kind() == Some(AlbumTabKind::About) {
                     let description = album.description.clone().unwrap_or_default();
-                    let paragraph = Paragraph::new(description).wrap(Wrap { trim: false });
-                    frame.render_widget(paragraph, content);
+                    render_about(frame, content, &description, &mut album.about_scroll);
                 } else if let Some(state) = album.current_state_mut() {
                     match state {
                         SelectedAlbumPopupSubtabMut::Tracks(track_list) => track_list.render(
@@ -717,8 +740,7 @@ impl Popup {
 
                 if artist.selected_tab_kind() == Some(TabKind::About) {
                     let description = artist.description.clone().unwrap_or_default();
-                    let paragraph = Paragraph::new(description).wrap(Wrap { trim: false });
-                    frame.render_widget(paragraph, content);
+                    render_about(frame, content, &description, &mut artist.about_scroll);
                 } else if let Some(state) = artist.current_state_mut() {
                     match state {
                         SelectedArtistPopupSubtabMut::Albums(album_list) => album_list.render(
@@ -874,6 +896,13 @@ impl Popup {
                         Ok(Output::Popup(Popup::Artist(state)))
                     }
                     _ => {
+                        if album_state.selected_tab_kind() == Some(AlbumTabKind::About) {
+                            if let Some(delta) = about_scroll_delta(key_event.code) {
+                                album_state.scroll_about(delta);
+                            }
+                            return Ok(Output::Consumed);
+                        }
+
                         if album_state.selected_tab_kind() == Some(AlbumTabKind::GoToArtist) {
                             if key_event.code == KeyCode::Enter {
                                 let state =
@@ -916,6 +945,13 @@ impl Popup {
                         Ok(Output::Consumed)
                     }
                     _ => {
+                        if artist_popup_state.selected_tab_kind() == Some(TabKind::About) {
+                            if let Some(delta) = about_scroll_delta(key_event.code) {
+                                artist_popup_state.scroll_about(delta);
+                            }
+                            return Ok(Output::Consumed);
+                        }
+
                         let artist_id = artist_popup_state.id;
                         let current_state = artist_popup_state.current_state_mut();
                         match current_state {
@@ -1140,6 +1176,82 @@ async fn open_track_album(track: &Track, client: &Client) -> AppResult<Output> {
         )))
     } else {
         Ok(Output::Consumed)
+    }
+}
+
+fn about_scroll_delta(code: KeyCode) -> Option<i16> {
+    match code {
+        KeyCode::Up | KeyCode::Char('k') => Some(-1),
+        KeyCode::Down | KeyCode::Char('j') => Some(1),
+        KeyCode::PageUp => Some(-10),
+        KeyCode::PageDown => Some(10),
+        _ => None,
+    }
+}
+
+fn wrap_text(text: &str, width: u16) -> Vec<Line<'static>> {
+    let width = (width as usize).max(1);
+    let mut lines = Vec::new();
+
+    for paragraph in text.lines() {
+        let mut current = String::new();
+        let mut current_len = 0;
+
+        for word in paragraph.split_whitespace() {
+            let word_len = word.chars().count();
+            let extra = if current_len == 0 {
+                word_len
+            } else {
+                word_len + 1
+            };
+
+            if current_len > 0 && current_len + extra > width {
+                lines.push(Line::from(std::mem::take(&mut current)));
+                current_len = 0;
+            }
+
+            if current_len > 0 {
+                current.push(' ');
+                current_len += 1;
+            }
+            current.push_str(word);
+            current_len += word_len;
+        }
+
+        lines.push(Line::from(current));
+    }
+
+    lines
+}
+
+fn render_about(frame: &mut Frame, area: Rect, description: &str, scroll: &mut ScrollbarState) {
+    let [text_area, bar_area] =
+        Layout::horizontal([Constraint::Min(0), Constraint::Length(2)]).areas(area);
+
+    let lines = wrap_text(description, text_area.width);
+    let total = lines.len() as u16;
+    let viewport = text_area.height;
+    let max_scroll = total.saturating_sub(viewport);
+
+    let position = scroll.get_position().min(max_scroll as usize);
+    *scroll = scroll
+        .position(position)
+        .content_length((max_scroll + 1) as usize)
+        .viewport_content_length(viewport as usize);
+
+    frame.render_widget(
+        Paragraph::new(Text::from(lines)).scroll((position as u16, 0)),
+        text_area,
+    );
+
+    if total > viewport {
+        frame.render_stateful_widget(
+            Scrollbar::new(ScrollbarOrientation::VerticalRight)
+                .begin_symbol(None)
+                .end_symbol(None),
+            bar_area,
+            scroll,
+        );
     }
 }
 
