@@ -55,6 +55,10 @@ impl NotificationList {
     pub fn notifications(&self) -> Vec<&Notification> {
         self.notifications.iter().map(|x| &x.0).collect()
     }
+
+    pub fn is_empty(&self) -> bool {
+        self.notifications.is_empty()
+    }
 }
 
 pub struct App {
@@ -236,6 +240,9 @@ impl App {
             self.now_playing.image = image;
         };
 
+        terminal.draw(|frame| self.render(frame))?;
+        self.should_draw = false;
+
         while !self.exit {
             tokio::select! {
                 // Prioritize keyboard events by checking them first with biased
@@ -291,9 +298,7 @@ impl App {
                     self.should_draw = true;
                 }
 
-                _ = tick_interval.tick() => {
-                    // Tick is only used for notification cleanup
-                }
+                _ = tick_interval.tick(), if !self.notifications.is_empty() => {}
 
                 notification = receiver.recv() => {
                     if let Ok(notification) = notification {
@@ -570,28 +575,27 @@ impl App {
                 }
             }
             Output::AddTrackToPlaylistPopup(track) => {
-                let playlists_res = self.client.favorites().await.map(|favs| {
-                    favs.playlists
-                        .into_iter()
-                        .filter(|p| p.is_owned)
-                        .map(|x| x.into())
-                        .collect::<Vec<_>>()
-                });
+                let playlists = self
+                    .favorites
+                    .playlists
+                    .all_items()
+                    .iter()
+                    .filter(|p| p.is_owned)
+                    .cloned()
+                    .collect();
 
-                if let Ok(playlists) = playlists_res {
-                    let mut popups = match std::mem::take(&mut self.app_state) {
-                        AppState::Popup(v) => v,
-                        other => {
-                            self.app_state = other;
-                            Vec::new()
-                        }
-                    };
+                let mut popups = match std::mem::take(&mut self.app_state) {
+                    AppState::Popup(v) => v,
+                    other => {
+                        self.app_state = other;
+                        Vec::new()
+                    }
+                };
 
-                    popups.push(Popup::Track(TrackPopupState::new(track, playlists)));
+                popups.push(Popup::Track(TrackPopupState::new(track, playlists)));
 
-                    self.app_state = AppState::Popup(popups);
-                    self.should_draw = true;
-                }
+                self.app_state = AppState::Popup(popups);
+                self.should_draw = true;
             }
             Output::AddTrackToPlaylistAndPopPopup((track_id, playlist_id)) => {
                 match self
@@ -605,7 +609,6 @@ impl App {
                             if popups.is_empty() {
                                 self.app_state = AppState::Normal;
                             }
-                            self.update_favorites().await;
                         }
                         self.notifications
                             .push(Notification::Info("Added to playlist".into())); // Add track and playlist name
