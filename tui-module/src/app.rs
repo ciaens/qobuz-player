@@ -609,6 +609,7 @@ impl App {
                             if popups.is_empty() {
                                 self.app_state = AppState::Normal;
                             }
+                            self.update_favorites().await;
                         }
                         self.notifications
                             .push(Notification::Info("Added to playlist".into())); // Add track and playlist name

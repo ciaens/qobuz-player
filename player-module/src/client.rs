@@ -592,7 +592,16 @@ impl Client {
         let client = self.get_client().await?;
         client.playlist_add_track(playlist_id, track_ids).await?;
         self.playlist_cache.invalidate(&playlist_id).await;
-        self.playlist(playlist_id).await
+        let playlist = self.playlist(playlist_id).await?;
+
+        if let Some(mut cache) = self.favorites_cache.get().await
+            && let Some(existing) = cache.playlists.iter_mut().find(|p| p.id == playlist.id)
+        {
+            existing.duration_seconds = playlist.duration_seconds;
+            self.favorites_cache.set(cache).await;
+        }
+
+        Ok(playlist)
     }
 
     pub async fn playlist_delete_track(
