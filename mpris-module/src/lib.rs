@@ -126,10 +126,22 @@ impl PlayerInterface for MprisPlayer {
 
         let new_position = match offset_millis < 0 {
             true => {
-                current_position - Duration::from_millis(offset_millis.abs().try_into().unwrap())
+                current_position
+                    - Duration::from_millis(
+                        offset_millis
+                            .abs()
+                            .try_into()
+                            .map_err(|e| fdo::Error::InvalidArgs(format!("{e}")))?,
+                    )
             }
             false => {
-                current_position + Duration::from_millis(offset_millis.abs().try_into().unwrap())
+                current_position
+                    + Duration::from_millis(
+                        offset_millis
+                            .abs()
+                            .try_into()
+                            .map_err(|e| fdo::Error::InvalidArgs(format!("{e}")))?,
+                    )
             }
         };
 
@@ -137,8 +149,18 @@ impl PlayerInterface for MprisPlayer {
         Ok(())
     }
 
-    async fn set_position(&self, _track_id: TrackId, _position: Time) -> fdo::Result<()> {
-        Err(fdo::Error::NotSupported("Not supported".into()))
+    async fn set_position(&self, _track_id: TrackId, position: Time) -> fdo::Result<()> {
+        let millis: u64 = position
+            .as_millis()
+            .abs()
+            .try_into()
+            .map_err(|e| fdo::Error::InvalidArgs(format!("{e}")))?;
+
+        let position = Duration::from_millis(millis);
+
+        self.controls.seek(position);
+
+        Ok(())
     }
 
     async fn open_uri(&self, _uri: String) -> fdo::Result<()> {
@@ -349,6 +371,12 @@ fn track_to_metadata(track: &Track) -> Metadata {
     // track
     metadata.set_title(Some(track.title.clone()));
     metadata.set_track_number(Some(track.number as i32));
+    metadata.set_trackid(track_id(track.id));
 
     metadata
+}
+
+fn track_id(id: u32) -> Option<TrackId> {
+    let string = format!("/org/mpris/MediaPlayer2/Track/{}", id);
+    string.try_into().ok()
 }

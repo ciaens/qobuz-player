@@ -177,6 +177,7 @@ impl Controls {
         self.send(ControlCommand::SetAutoPlay { enable });
     }
 
+    /// Set absolute current position
     pub fn seek(&self, time: Duration) {
         self.send(ControlCommand::Seek { time });
     }
