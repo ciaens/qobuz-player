@@ -19,7 +19,6 @@ The web interface is ideal for a setup with a single board computer, e.g. Raspbe
 [More info](/tui-module)
 
 ### Web UI
-<img src="/assets/web-moduleui.jpg?raw=true" width="240">
 [More info](/web-module)
 
 ### RFID player
