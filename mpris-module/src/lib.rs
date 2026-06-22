@@ -244,10 +244,7 @@ impl PlayerInterface for MprisPlayer {
     }
 
     async fn can_go_previous(&self) -> fdo::Result<bool> {
-        let tracklist = self.tracklist_receiver.borrow();
-        let current_position = tracklist.current_position();
-
-        Ok(current_position > 0)
+        Ok(true)
     }
 
     async fn can_play(&self) -> fdo::Result<bool> {
