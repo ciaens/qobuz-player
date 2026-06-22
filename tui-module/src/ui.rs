@@ -108,10 +108,10 @@ impl App {
             Tab::Preferences => self.preferences.render(frame, tab_content_area),
         }
 
-        if let AppState::Popup(popups) = &mut self.app_state {
-            for popup in popups {
-                popup.render(frame, &self.favorite_ids);
-            }
+        if let AppState::Popup(popups) = &mut self.app_state
+            && let Some(popup) = popups.last_mut()
+        {
+            popup.render(frame, &self.favorite_ids);
         }
     }
 
