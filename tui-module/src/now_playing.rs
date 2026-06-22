@@ -86,18 +86,30 @@ pub fn render(
 
     let ratio = duration as f64 / (track.duration_seconds * 1000) as f64;
 
-    let label = format!(
-        "{} / {}",
-        format_mseconds(state.duration_ms),
-        format_seconds(track.duration_seconds),
-    );
+    let progress_chunks = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([
+            Constraint::Length(7),
+            Constraint::Min(1),
+            Constraint::Length(7),
+        ])
+        .split(info_chunks[1]);
 
-    let gauge = Gauge::default()
-        .ratio(ratio)
-        .gauge_style(HIGHLIGHT_TEXT_STYLE)
-        .label(label);
+    let current_time =
+        Paragraph::new(format_mseconds(state.duration_ms)).alignment(Alignment::Left);
 
-    frame.render_widget(gauge, info_chunks[1]);
+    let total_time =
+        Paragraph::new(format_seconds(track.duration_seconds)).alignment(Alignment::Right);
+
+    let gauge_width = progress_chunks[1].width as usize;
+
+    let gauge_str = smooth_gauge(ratio, gauge_width);
+
+    let gauge = Paragraph::new(gauge_str).style(HIGHLIGHT_TEXT_STYLE);
+
+    frame.render_widget(current_time, progress_chunks[0]);
+    frame.render_widget(gauge, progress_chunks[1]);
+    frame.render_widget(total_time, progress_chunks[2]);
     frame.render_widget(Text::from(lines), info_chunks[0]);
 }
 
@@ -107,4 +119,30 @@ fn get_status(state: Status) -> String {
         Status::Paused => "Paused ⏸ ".to_string(),
         Status::Buffering => "Buffering".to_string(),
     }
+}
+
+fn smooth_gauge(ratio: f64, width: usize) -> String {
+    let blocks = [" ", "▏", "▎", "▍", "▌", "▋", "▊", "▉", "█"];
+
+    let total = ratio * width as f64;
+    let full = total.floor() as usize;
+    let frac = ((total - full as f64) * 8.0).round() as usize;
+
+    let mut s = String::new();
+
+    for _ in 0..full {
+        s.push('█');
+    }
+
+    if full < width {
+        s.push_str(blocks[frac]);
+    }
+
+    let remaining = width.saturating_sub(full + 1);
+
+    for _ in 0..remaining {
+        s.push(' ');
+    }
+
+    s
 }
