@@ -36,12 +36,14 @@ pub fn render(
         .map(|x| x as u16)
         .unwrap_or(0);
 
-    let chunks = match disable_tui_album_cover {
-        true => std::rc::Rc::new([block.inner(area)]),
-        false => Layout::default()
+    let chunks = if disable_tui_album_cover {
+        vec![block.inner(area)]
+    } else {
+        Layout::default()
             .direction(Direction::Horizontal)
             .constraints([Constraint::Length(length), Constraint::Min(1)])
-            .split(block.inner(area)),
+            .split(block.inner(area))
+            .to_vec()
     };
 
     if !full_screen {
@@ -62,15 +64,15 @@ pub fn render(
 
     let mut lines = vec![];
 
-    if let Some(entity) = &state.entity_title {
-        lines.push(Line::from(entity.clone()).style(Style::new().bold()));
-    }
+    lines.push(Line::from(track.title.as_str()).bold());
 
     if let Some(artist) = &track.artist_name {
-        lines.push(Line::from(artist.clone()));
+        lines.push(Line::from(artist.as_str()));
     }
 
-    lines.push(Line::from(track.title.clone()));
+    if let Some(entity) = &state.entity_title {
+        lines.push(Line::from(entity.as_str()));
+    }
 
     lines.push(Line::from(format!(
         "{} of {}",
@@ -78,11 +80,8 @@ pub fn render(
         state.tracklist_length
     )));
 
-    let duration = if state.duration_ms < track.duration_seconds * 1000 {
-        state.duration_ms
-    } else {
-        track.duration_seconds * 1000
-    };
+    let total_ms = track.duration_seconds.saturating_mul(1000);
+    let duration = state.duration_ms.min(total_ms);
 
     let ratio = duration as f64 / (track.duration_seconds * 1000) as f64;
 
@@ -113,11 +112,11 @@ pub fn render(
     frame.render_widget(Text::from(lines), info_chunks[0]);
 }
 
-fn get_status(state: Status) -> String {
+fn get_status(state: Status) -> &'static str {
     match state {
-        Status::Playing => "Playing ⏵".to_string(),
-        Status::Paused => "Paused ⏸ ".to_string(),
-        Status::Buffering => "Buffering".to_string(),
+        Status::Playing => "Playing ⏵",
+        Status::Paused => "Paused ⏸",
+        Status::Buffering => "Buffering",
     }
 }
 
