@@ -118,7 +118,7 @@ pub enum Output {
     Popup(Popup),
     PopPopupUpdateFavorites,
     AddTrackToPlaylistPopup(Track),
-    AddTrackToPlaylistAndPopPopup((u32, u32)),
+    AddTrackToPlaylistAndPopPopup((Track, u32)),
 }
 
 pub enum FavoriteAdd {
@@ -597,13 +597,16 @@ impl App {
                 self.app_state = AppState::Popup(popups);
                 self.should_draw = true;
             }
-            Output::AddTrackToPlaylistAndPopPopup((track_id, playlist_id)) => {
+            Output::AddTrackToPlaylistAndPopPopup((track, playlist_id)) => {
                 match self
                     .client
-                    .playlist_add_track(playlist_id, &[track_id])
+                    .playlist_add_track(playlist_id, &[track.id])
                     .await
                 {
                     Ok(_) => {
+                        self.client
+                            .add_playlist_duration(playlist_id, track.duration_seconds)
+                            .await;
                         if let AppState::Popup(popups) = &mut self.app_state {
                             popups.pop();
                             if popups.is_empty() {
@@ -827,7 +830,7 @@ pub fn get_current_state_without_image(
             (Some(tracklist.artist_name.clone()), track_image.cloned())
         }
         TracklistType::Tracks => (
-            track.as_ref().map(|x| x.title.clone()),
+            track.as_ref().and_then(|x| x.album_title.clone()),
             track_image.cloned(),
         ),
     };

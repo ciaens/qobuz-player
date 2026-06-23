@@ -592,16 +592,16 @@ impl Client {
         let client = self.get_client().await?;
         client.playlist_add_track(playlist_id, track_ids).await?;
         self.playlist_cache.invalidate(&playlist_id).await;
-        let playlist = self.playlist(playlist_id).await?;
+        self.playlist(playlist_id).await
+    }
 
+    pub async fn add_playlist_duration(&self, playlist_id: u32, seconds: u32) {
         if let Some(mut cache) = self.favorites_cache.get().await
-            && let Some(existing) = cache.playlists.iter_mut().find(|p| p.id == playlist.id)
+            && let Some(playlist) = cache.playlists.iter_mut().find(|p| p.id == playlist_id)
         {
-            existing.duration_seconds = playlist.duration_seconds;
+            playlist.duration_seconds += seconds;
             self.favorites_cache.set(cache).await;
         }
-
-        Ok(playlist)
     }
 
     pub async fn playlist_delete_track(
