@@ -5,7 +5,7 @@ Version=1.0
 Name=Qobine
 Comment=Unofficial client for Qobuz
 
-Exec=gtk-module
+Exec=qobine-gtk
 Icon=io.github.sofusa.qobine
 
 Categories=Audio;Music;Player;
