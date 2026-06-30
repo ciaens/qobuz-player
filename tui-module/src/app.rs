@@ -336,13 +336,17 @@ impl App {
     fn apply_favorite_added(&mut self, added: FavoriteAdd) {
         match added {
             FavoriteAdd::Track(track) => {
-                self.favorite_ids.tracks.insert(track.id);
+                if !self.favorite_ids.tracks.insert(track.id) {
+                    return;
+                }
                 let mut items = self.favorites.tracks.all_items().clone();
                 items.insert(0, track);
                 self.favorites.tracks.set_all_items(items);
             }
             FavoriteAdd::Album(album) => {
-                self.favorite_ids.albums.insert(album.id.clone());
+                if !self.favorite_ids.albums.insert(album.id.clone()) {
+                    return;
+                }
                 let mut items = self.favorites.albums.all_items().clone();
                 items.push(album);
                 items.sort_by(|a, b| {
@@ -354,7 +358,9 @@ impl App {
                 self.favorites.albums.set_all_items(items);
             }
             FavoriteAdd::Artist(artist) => {
-                self.favorite_ids.artists.insert(artist.id);
+                if !self.favorite_ids.artists.insert(artist.id) {
+                    return;
+                }
                 let mut items = self.favorites.artists.all_items().clone();
                 items.push(artist);
                 items.sort_by_key(|a| a.name.to_lowercase());
